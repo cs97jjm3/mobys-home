@@ -1,0 +1,5 @@
+aiohttp
+aioamazondevices
+samsungtvws
+PSNAWP
+pytest

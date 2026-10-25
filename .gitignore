@@ -1,0 +1,20 @@
+# Private: passwords, PINs and sign-ins. Never put these on GitHub.
+home_config.ini
+home_secret.txt
+alexa_login.json
+alexa_data/
+alexa_devices.json
+psn_token.json
+samsung_token.txt
+weather_location.txt
+tuya_found.json
+
+# Logs and old copies
+*.log
+*_old.py
+
+# Python's own files
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
