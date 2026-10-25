@@ -61,3 +61,22 @@ def test_tv_app_on_screen():
 def test_tv_no_app_on_screen():
     tv, showing = run_on_screen({"3201907018807": {"name": "Netflix", "visible": False, "running": True}})
     assert showing is None
+
+
+def test_dial_state():
+    xml = ('<?xml version="1.0"?><service xmlns="urn:dial-multiscreen-org:schemas:dial" dialVer="2.2">'
+           '<name>Netflix</name><options allowStop="true"/><state>running</state></service>')
+    assert dl.parse_dial_state(xml) == "running"
+    assert dl.parse_dial_state("<x/>") is None
+
+
+def test_box_app_added_to_tv():
+    devices = dl.Devices({"tv_ip": "1.2.3.4", "tv_mac": "", "tv_default": "BT TV", "box_ip": "1.2.3.5"}, "/tmp")
+    devices.state = {"tv": {"state": "on", "watching": "BT TV", "apps": []},
+                     "box": {"reachable": True, "app": "Netflix"}}
+    assert devices.snapshot()["tv"]["watching"] == "BT TV · Netflix"
+    devices.state["tv"]["watching"] = "YouTube"     # an app on the Samsung itself wins
+    assert devices.snapshot()["tv"]["watching"] == "YouTube"
+    devices.state["box"]["app"] = None
+    devices.state["tv"]["watching"] = "BT TV"
+    assert devices.snapshot()["tv"]["watching"] == "BT TV"

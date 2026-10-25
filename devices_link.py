@@ -12,6 +12,9 @@ Samsung TV (2016 or newer):
 PS5: asks the console directly, the same way the PS Remote Play app finds it.
   Answers "on" or "rest mode", and often the name of the game that's running.
 
+TV box (BT / EE TV Box Pro): asks which streaming app it's running (Netflix,
+  YouTube). Live TV and standby both show as nothing running.
+
 Xbox: asks the console directly, the same way the Xbox app finds it. If it
   doesn't answer but is still on the network, it's asleep.
 """
@@ -152,6 +155,52 @@ async def xbox_status(ip):
     if await on_network(ip):
         return {"state": "asleep", "name": None}
     return {"state": "off", "name": None}
+
+
+# ---------- TV box (BT / EE TV Box Pro, and others that speak DIAL) ----------
+
+BOX_PORT = 56789
+BOX_APPS = ["Netflix", "YouTube"]
+# Some apps only answer when the question says it comes from them
+BOX_ORIGINS = [None, "https://www.youtube.com", "https://www.netflix.com"]
+
+
+def parse_dial_state(xml):
+    """Pull <state> out of a DIAL app reply: running, stopped or hidden."""
+    start, end = xml.find("<state>"), xml.find("</state>")
+    return xml[start + 7:end].strip().lower() if start != -1 and end > start else None
+
+
+class TVBox:
+    """Asks the TV box which streaming app is running. Live TV or standby shows as nothing running."""
+
+    def __init__(self, ip):
+        self.ip = ip
+        self.origin = {}   # app -> the Origin header it accepted
+
+    async def _state(self, session, app):
+        tries = [self.origin[app]] if app in self.origin else BOX_ORIGINS
+        for origin in tries:
+            try:
+                async with session.get(f"http://{self.ip}:{BOX_PORT}/apps/{app}",
+                                       headers={"Origin": origin} if origin else {},
+                                       timeout=aiohttp.ClientTimeout(total=3)) as r:
+                    if r.status == 403:
+                        continue
+                    if r.status != 200:
+                        return None
+                    self.origin[app] = origin
+                    return parse_dial_state(await r.text())
+            except Exception:
+                return "unreachable"
+        return None
+
+    async def status(self, session):
+        states = await asyncio.gather(*(self._state(session, a) for a in BOX_APPS))
+        if all(s == "unreachable" for s in states):
+            return {"reachable": False, "app": None}
+        running = [a for a, s in zip(BOX_APPS, states) if s == "running"]
+        return {"reachable": True, "app": running[0] if running else None}
 
 
 # ---------- Samsung TV ----------
@@ -318,6 +367,7 @@ class Devices:
         self.tv = (SamsungTV(config["tv_ip"], config["tv_mac"], Path(folder) / "samsung_token.txt",
                              config.get("tv_default", ""))
                    if config.get("tv_ip") else None)
+        self.box = TVBox(config["box_ip"]) if config.get("box_ip") else None
         self.ps5_lock = asyncio.Lock()
         self.state = {}
 
@@ -325,6 +375,8 @@ class Devices:
         jobs, names = [], []
         if self.tv:
             jobs.append(self.tv.status(session)); names.append("tv")
+        if self.box:
+            jobs.append(self.box.status(session)); names.append("box")
         if self.config.get("ps5_ip"):
             jobs.append(ps5_status(self.config["ps5_ip"], self.ps5_lock)); names.append("ps5")
         if self.config.get("xbox_ip"):
@@ -346,4 +398,10 @@ class Devices:
         for key in ("tv", "ps5", "xbox"):
             if key in self.state:
                 out[key] = dict(self.state[key], label=labels[key])
+        # When the TV is showing the box, say which app the box is running, e.g. "BT TV · Netflix"
+        tv, box = out.get("tv"), self.state.get("box") or {}
+        if tv and tv.get("state") == "on" and box.get("app"):
+            default = self.tv.default_source if self.tv else ""
+            if tv.get("watching") in (None, "", default):
+                tv["watching"] = f"{default} · {box['app']}" if default else box["app"]
         return out

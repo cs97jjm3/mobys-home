@@ -98,6 +98,7 @@ def load_config():
         "xbox_ip": get("devices", "xbox"),
         "xbox_name": get("devices", "xbox_name"),
         "tv_default": get("devices", "tv_default"),
+        "box_ip": get("devices", "tv_box"),
         "cast_on": get("chromecast", "enabled", "yes").lower() not in ("no", "false", "off", "0"),
         "cast_hosts": [h.strip() for h in get("chromecast", "hosts").split(",") if h.strip()],
         "postcode": get("location", "postcode"),
