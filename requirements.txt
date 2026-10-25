@@ -3,4 +3,5 @@ aioamazondevices
 samsungtvws
 PSNAWP
 pychromecast
+psutil
 pytest

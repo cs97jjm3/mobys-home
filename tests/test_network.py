@@ -47,3 +47,20 @@ def test_computer_busy():
     net.update(nl.parse_hub(busier), 1030)
     pc = net.snapshot()["computers"][0]
     assert pc["on"] and pc["busy"] and pc["mbps"] == 24.0
+
+
+def test_hub_details():
+    body = ("{mac:'b8%3A27%3Aeb%3A6b%3Ac4%3A7d',hostname:'raspberrypi',ip:'192.168.1.98',activity:'0',"
+            "time_last_active:'2026/10/25 20:23:18',port:'eth1'}")
+    d = nl.parse_hub(body)["b8:27:eb:6b:c4:7d"]
+    assert d["link"] == "Cable" and d["last_seen"] is not None
+    net = nl.HomeNetwork("hub", {}, {"Raspberry Pi": "b8:27:eb:6b:c4:7d"})
+    net.update(nl.parse_hub(body), 1000)
+    pi = net.snapshot()["computers"][0]
+    assert pi["on"] is False and pi["last_seen"] and pi["ip"] is None
+
+
+def test_this_computer_stats():
+    stats, macs = nl.this_computer()
+    if stats is not None:
+        assert 0 <= stats["cpu"] <= 100 and stats["uptime"] > 0
