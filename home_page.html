@@ -107,6 +107,9 @@
             background: var(--card); color: var(--ink); border-radius: 10px; padding: 7px 11px; cursor: pointer; }
   .dev .ctrls button:hover, .apps button:hover { border-color: var(--faint); }
   .dev .ctrls button.pw { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .casts { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 12px; }
+  .casts .np { margin-left: 0; }
+  .casts .vol { flex: none; }
   .apps { display: flex; gap: 6px; flex-wrap: wrap; }
   .hint { font-size: 12px; color: var(--warm); }
   .playing { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -209,6 +212,7 @@ const ICONS = {
   moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
   bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4"/></svg>',
   timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M10 2h4"/></svg>',
+  cast: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6M3 12a8 8 0 0 1 8 8M3 16a4 4 0 0 1 4 4M3 20h.01"/></svg>',
   shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/></svg>',
 };
 
@@ -266,7 +270,7 @@ function render() {
           ${a.switches.length ? `<div class="grid">${a.switches.map(switchTile).join("")}</div>`
             : '<p class="empty">No lights or plugs found in Alexa yet.</p>'}
         </div>
-        ${mediaCard(d.devices)}
+        ${mediaCard(d.devices, d.casts)}
         <div class="card">
           <div class="head"><p class="title">Routines</p><p class="sub">tap to run</p></div>
           ${a.routines.length ? `<div class="routines">${a.routines.map(r =>
@@ -350,14 +354,42 @@ function switchTile(s) {
     <span class="nm">${esc(s.name)}</span>${slider}<span class="st">${status}</span></button>`;
 }
 
-function mediaCard(dev) {
-  if (!dev || !Object.keys(dev).length) return "";
+function mediaCard(dev, casts) {
+  dev = dev || {};
+  casts = casts || [];
+  if (!Object.keys(dev).length && !casts.length) return "";
   const parts = [];
   if (dev.tv) parts.push(tvTile(dev.tv));
   if (dev.ps5) parts.push(consoleTile(dev.ps5, {on: "On", rest: "Rest mode", off: "Off"}));
   if (dev.xbox) parts.push(consoleTile(dev.xbox, {on: "On", asleep: "Asleep", off: "Off"}));
   return `<div class="card"><div class="head"><p class="title">TV and consoles</p></div>
-    <div class="media">${parts.join("")}</div></div>`;
+    ${parts.length ? `<div class="media">${parts.join("")}</div>` : ""}
+    ${casts.length ? `<div class="casts">${casts.map(castTile).join("")}</div>` : ""}</div>`;
+}
+
+function castTile(c) {
+  const live = c.online && c.state !== "idle";
+  const words = !c.online ? "Not connected" : c.state === "idle" ? "Nothing casting"
+    : `${c.state === "paused" ? "Paused" : "Casting"} · ${esc(c.app)}`;
+  const media = live && c.title ? `<div class="np cnp">
+      ${c.art ? `<img src="${esc(c.art)}" alt="" loading="lazy">` : `<span class="np-ph">${ICONS.music}</span>`}
+      <div class="np-t"><div class="np-1">${esc(c.title)}</div><div class="np-2">${esc(c.subtitle || c.app)}</div></div>
+      <div class="np-b">
+        ${c.can_pause ? `<button onclick="cast('${c.id}', '${c.state === "playing" ? "pause" : "play"}')"
+          aria-label="${c.state === "playing" ? "Pause" : "Play"}">${c.state === "playing" ? "⏸" : "▶"}</button>` : ""}
+        <button onclick="cast('${c.id}', 'stop')" aria-label="Stop casting" title="Stop casting">⏹</button>
+      </div></div>`
+    : live ? `<div class="ctrls"><button onclick="cast('${c.id}', 'stop')">Stop casting</button></div>` : "";
+  const vol = c.online && c.volume != null ? `<span class="vol">${ICONS.speaker}<input type="range" min="0" max="100"
+      value="${c.volume}" aria-label="Volume" onchange="cast('${c.id}', 'volume', +this.value)"><span>${c.volume}</span></span>` : "";
+  return `<div class="dev ${live ? "live" : ""}">
+    <div class="top"><span class="ic">${ICONS.cast}</span><div><div class="nm">${esc(c.name)}</div>
+      <div class="st">${words}</div></div></div>${media}${vol}</div>`;
+}
+
+async function cast(id, action, value) {
+  try { apply(await post("/api/cast", {id, action, value})); message(""); }
+  catch (e) { if (e.message !== "PIN needed") message(e.message, true); }
 }
 
 function tvTile(t) {
@@ -373,7 +405,7 @@ function tvTile(t) {
     : `<div class="ctrls"><button class="pw" onclick="tv('power_on')">Turn on</button></div>`;
   return `<div class="dev tv ${on ? "live" : ""}">
     <div class="top"><span class="ic">${ICONS.tv}</span><div><div class="nm">${esc(t.label)}</div>
-      <div class="st">${words[t.state] || t.state}${t.model ? " · " + esc(t.model) : ""}</div></div></div>
+      <div class="st">${words[t.state] || t.state}${on && t.watching ? " · " + esc(t.watching) : t.model ? " · " + esc(t.model) : ""}</div></div></div>
     ${ctrls}${apps}
     ${t.needs_allow ? '<div class="hint">Look at the TV and choose Allow, then try again.</div>' : ""}</div>`;
 }

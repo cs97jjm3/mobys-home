@@ -4,6 +4,7 @@ home network, with no accounts or cloud logins.
 
 Samsung TV (2016 or newer):
   - on / standby / off, read from the TV's own little web page on port 8001
+  - which app is on screen (Netflix, YouTube...), or your usual source, e.g. "BT TV"
   - power off, volume and mute, and opening apps, over the TV's remote-control
     connection (port 8002). The first time, the TV asks you to Allow it.
   - power on with a Wake-on-LAN message (needs "Power On with Mobile" on the TV)
@@ -155,13 +156,21 @@ async def xbox_status(ip):
 
 # ---------- Samsung TV ----------
 
+# Samsung's app numbers for the main apps. Checked on our 2023 TV; any the TV doesn't
+# have just answer "not found" and are skipped.
+KNOWN_APPS = {
+    "3201907018807": "Netflix", "111299001912": "YouTube", "3201910019365": "Prime Video",
+    "3201901017640": "Disney+", "3201807016597": "Apple TV", "3201606009684": "Spotify",
+}
+
 FAVOURITE_APPS = ["Netflix", "YouTube", "Prime Video", "Disney+", "BBC iPlayer", "ITVX",
                   "Channel 4", "My5", "Apple TV", "NOW", "Spotify", "Plex", "F1 TV"]
 
 
 class SamsungTV:
-    def __init__(self, ip, mac, token_file):
+    def __init__(self, ip, mac, token_file, default_source=""):
         self.ip, self.mac = ip, mac
+        self.default_source = default_source   # what's on when no app is showing, e.g. "BT TV"
         self.token_file = Path(token_file)
         self.apps = []
         self.apps_fetched = 0
@@ -212,9 +221,39 @@ class SamsungTV:
             self._loading = True
             self.apps_fetched = time.time() - 6 * 3600 + 300   # retry in 5 minutes if it fails
             asyncio.create_task(self._load_apps_quietly())
+        if result["state"] == "on":
+            result["watching"] = await self._on_screen(session) or self.default_source or None
         result["apps"] = self.apps
         result["needs_allow"] = self.needs_allow and not self.token_file.exists()
         return result
+
+    async def _app_state(self, session, app_id):
+        try:
+            async with session.get(f"http://{self.ip}:8001/api/v2/applications/{app_id}",
+                                   timeout=aiohttp.ClientTimeout(total=2.5)) as r:
+                if r.status != 200:
+                    return None
+                return await r.json(content_type=None)
+        except Exception:
+            return None
+
+    async def _on_screen(self, session):
+        """The app that's on screen right now, if any. Nothing means another input, like the BT box."""
+        ids = list(dict.fromkeys(list(KNOWN_APPS) + [a["id"] for a in self.apps]))
+        answers = await asyncio.gather(*(self._app_state(session, i) for i in ids))
+        installed = []
+        showing = None
+        for app_id, info in zip(ids, answers):
+            if not isinstance(info, dict):
+                continue
+            name = KNOWN_APPS.get(app_id) or info.get("name") or "an app"
+            installed.append({"id": app_id, "name": name})
+            if info.get("visible") and not showing:
+                showing = name
+        # Some TVs never send their full app list, so offer the main apps we know are there
+        if not self.apps and installed:
+            self.apps = installed
+        return showing
 
     async def _run(self, action, timeout=8):
         def work():
@@ -276,7 +315,8 @@ class Devices:
 
     def __init__(self, config, folder):
         self.config = config
-        self.tv = (SamsungTV(config["tv_ip"], config["tv_mac"], Path(folder) / "samsung_token.txt")
+        self.tv = (SamsungTV(config["tv_ip"], config["tv_mac"], Path(folder) / "samsung_token.txt",
+                             config.get("tv_default", ""))
                    if config.get("tv_ip") else None)
         self.ps5_lock = asyncio.Lock()
         self.state = {}

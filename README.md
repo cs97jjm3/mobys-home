@@ -9,7 +9,8 @@ A home dashboard that runs on a Windows PC and shows everything in one place. It
 - **Echos:** whether each one is online, what's playing (with play, pause and skip), the volume, Do Not Disturb, and the next alarm or timer.
 - **Weather:** now, the next few hours and the next five days, from Open-Meteo. You don't need an account.
 - **TV and consoles:**
-  - Samsung TV: whether it's on, with power, volume and apps.
+  - Samsung TV: whether it's on and which app is on screen (or your usual source, like BT TV), with power, volume and apps.
+  - Chromecasts and Google TVs: found by themselves. Shows what's being cast, with the title and picture, play, pause, stop and volume.
   - PS5: on or in rest mode. It can also show which game is being played, if you link a PlayStation account.
   - Xbox: on or asleep.
 - **Other dashboards:** tiles for Moby's Heat (heating) and the race weekend dashboard. Each opens in its own window.

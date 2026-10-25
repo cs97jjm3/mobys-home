@@ -33,6 +33,7 @@ from aiohttp import web
 from yarl import URL
 
 from alexa_link import Alexa
+from chromecast_link import Chromecasts
 from devices_link import Devices
 from psn_link import CHECK_EVERY as PSN_EVERY, PlayStation
 from weather_link import Weather
@@ -56,6 +57,7 @@ ALEXA = web.AppKey("alexa", object)
 DEVICES = web.AppKey("devices", object)
 PSN = web.AppKey("psn", object)
 WEATHER = web.AppKey("weather", object)
+CASTS = web.AppKey("casts", object)
 CONFIG = web.AppKey("config", dict)
 PIN = web.AppKey("pin", str)
 SECRET = web.AppKey("secret", str)
@@ -95,6 +97,9 @@ def load_config():
         "ps5_name": get("devices", "ps5_name"),
         "xbox_ip": get("devices", "xbox"),
         "xbox_name": get("devices", "xbox_name"),
+        "tv_default": get("devices", "tv_default"),
+        "cast_on": get("chromecast", "enabled", "yes").lower() not in ("no", "false", "off", "0"),
+        "cast_hosts": [h.strip() for h in get("chromecast", "hosts").split(",") if h.strip()],
         "postcode": get("location", "postcode"),
         "psn_npsso": get("playstation", "npsso"),
         "psn_online_id": get("playstation", "online_id"),
@@ -303,6 +308,7 @@ def status_payload(app):
                  "port": URL(config["race_url"]).port or 8080},
         "devices": devices_with_game(app),
         "weather": app[WEATHER].snapshot(),
+        "casts": app[CASTS].snapshot(),
         "log": state.get("log", []),
     }
 
@@ -388,6 +394,23 @@ async def api_echo(request):
     return web.json_response(status_payload(app))
 
 
+async def api_cast(request):
+    app = request.app
+    casts = app[CASTS]
+    body = await request.json()
+    uid, action, value = str(body.get("id", "")), str(body.get("action", "")), body.get("value")
+    name = casts.name_of(uid)
+    words = {"play": "playing", "pause": "paused", "stop": "stopped casting"}
+    try:
+        await casts.control(uid, action, value)
+        if action in words:
+            log(app, f"{name}: {words[action]}")
+    except Exception as err:
+        log(app, f"{name}: couldn't do that ({err})", ok=False)
+        return web.json_response({"ok": False, "error": f"The Chromecast didn't do that: {err}"}, status=502)
+    return web.json_response(status_payload(app))
+
+
 async def api_refresh(request):
     try:
         await request.app[ALEXA].refresh(force=True)
@@ -401,6 +424,7 @@ def build_app(alexa, config, pin):
     app[ALEXA] = alexa
     app[DEVICES] = Devices(config, HERE)
     app[WEATHER] = Weather(config["postcode"], HERE / "weather_location.txt")
+    app[CASTS] = Chromecasts(config["cast_on"], config["cast_hosts"])
     app[PSN] = PlayStation(config["psn_npsso"], HERE / "psn_token.json", config["psn_online_id"])
     app[CONFIG] = config
     app[PIN] = pin or ""
@@ -416,10 +440,12 @@ def build_app(alexa, config, pin):
         except Exception as err:
             print(f"Alexa: first refresh failed ({err}), will keep trying")
         app[JOBS]["background"] = asyncio.create_task(background(app))
+        await asyncio.to_thread(app[CASTS].start)
 
     async def on_cleanup(app):
         if "background" in app[JOBS]:
             app[JOBS]["background"].cancel()
+        await asyncio.to_thread(app[CASTS].stop)
         await alexa.stop()
 
     app.on_startup.append(on_startup)
@@ -436,6 +462,7 @@ def build_app(alexa, config, pin):
     app.router.add_post("/api/refresh", api_refresh)
     app.router.add_post("/api/tv", api_tv)
     app.router.add_post("/api/echo", api_echo)
+    app.router.add_post("/api/cast", api_cast)
     return app
 
 
