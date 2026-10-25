@@ -58,10 +58,27 @@
       { serial: "e5", name: "Garage Dot", model: "Echo Dot", online: false },
     ],
     routines: ["Good morning", "Goodnight", "Film night", "Sunset lights", "Leaving the house"],
-    tv: { state: "on", label: "Samsung TV", model: "55\" Crystal UHD", needs_allow: false,
+    tv: { state: "on", label: "Samsung TV", model: "55\" Crystal UHD", watching: "BT TV · streaming", needs_allow: false,
           apps: ["Netflix", "YouTube", "BBC iPlayer", "Prime Video", "Disney+", "ITVX"].map((name, i) => ({ id: String(i), name })) },
     ps5: { state: "on", label: "PS5", game: "F1 25", game_icon: null, psn_warning: null },
     xbox: { state: "asleep", label: "Xbox" },
+    casts: [
+      { id: "c1", name: "Bedroom TV", model: "Chromecast", online: true, app: "Spotify", state: "playing",
+        title: "Kettle On", subtitle: "Moby & the Echos", art: null, can_pause: true, volume: 35 },
+      { id: "c2", name: "Living Room Google TV", model: "Chromecast HD", online: true, app: null, state: "idle",
+        title: null, subtitle: null, art: null, can_pause: false, volume: 80 },
+    ],
+    people: [{ name: "James", home: true, since: start - 3 * 3600 }, { name: "Claire", home: false, since: start - 40 * 60 },
+             { name: "Ed", home: true, since: start - 25 * 60 }],
+    computers: [
+      { name: "Home PC", on: true, busy: false, mbps: 0.4, ip: "192.168.1.20", link: "Cable",
+        stats: { here: true, cpu: 12, memory: 58, disk_free_gb: 214, disk_used: 46, uptime: 3 * 86400 + 5 * 3600, temp: null } },
+      { name: "Laptop", on: true, busy: true, mbps: 24.0, ip: "192.168.1.31", link: "Wi-Fi",
+        stats: { cpu: 41, memory: 72, disk_free_gb: 88, disk_used: 63, uptime: 5 * 3600, temp: null } },
+      { name: "Raspberry Pi", on: true, busy: false, mbps: 0.1, ip: "192.168.1.40", link: "Wi-Fi",
+        stats: { cpu: 9, memory: 34, disk_free_gb: 3, disk_used: 81, uptime: 12 * 86400, temp: 51.5 } },
+      { name: "Old laptop", on: false, busy: false, mbps: null, last_seen: start - 7 * 3600 },
+    ],
     log: [],
   };
   const wx = weather();
@@ -81,6 +98,8 @@
       race: { running: true, link: "https://edsf1.jmmcp.uk", port: 8080 },
       devices: { tv: house.tv, ps5: house.ps5, xbox: house.xbox },
       weather: wx,
+      casts: house.casts,
+      home: { people: house.people, computers: house.computers, error: null, updated: now() },
       log: house.log,
     };
   }
@@ -113,8 +132,18 @@
       const words = { power_on: "Turned the TV on", power_off: "Turned the TV off", volume_up: "TV volume up",
                       volume_down: "TV volume down", mute: "TV muted", app: `Opened ${b.app_name || "an app"} on the TV` };
       if (b.action === "power_on") tv.state = "on";
+      if (b.action === "app") tv.watching = b.app_name;
       if (b.action === "power_off") tv.state = "standby";
       note(words[b.action] || "TV");
+      return status();
+    },
+    "/api/cast": async b => {
+      await wait(300);
+      const c = house.casts.find(x => x.id === b.id);
+      if (b.action === "pause") c.state = "paused";
+      if (b.action === "play") c.state = "playing";
+      if (b.action === "volume") c.volume = b.value;
+      if (b.action === "stop") { Object.assign(c, { app: null, state: "idle", title: null, subtitle: null }); note(`${c.name}: stopped casting`); }
       return status();
     },
     "/api/echo": async b => {
