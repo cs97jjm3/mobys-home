@@ -80,3 +80,25 @@ def test_box_app_added_to_tv():
     devices.state["box"]["app"] = None
     devices.state["tv"]["watching"] = "BT TV"
     assert devices.snapshot()["tv"]["watching"] == "BT TV"
+
+
+HUB_BODY = ("{timestamp:'0',app:'4294967295',mac:'72%3A6b%3Aa0%3A98%3A52%3Ad6',tx:'258535792',rx:'2645303994'}, "
+            "{timestamp:'0',app:'4294967295',mac:'7c%3A16%3A89%3A9c%3A05%3A97',tx:'1360554892',rx:'105964860177'}")
+
+
+def test_hub_traffic_parse():
+    assert dl.HubTraffic.parse(HUB_BODY, "7c:16:89:9c:05:97") == 105964860177
+    assert dl.HubTraffic.parse(HUB_BODY, "00:11:22:33:44:55") is None
+
+
+def test_streaming_shown_on_tv():
+    devices = dl.Devices({"tv_ip": "1.2.3.4", "tv_mac": "", "tv_default": "BT TV", "box_ip": "1.2.3.5",
+                          "box_mac": "7C:16:89:9C:05:97"}, "/tmp")
+    devices.state = {"tv": {"state": "on", "watching": "BT TV", "apps": []},
+                     "box": {"reachable": True, "app": None}, "traffic": {"mbps": 9.6, "streaming": True}}
+    assert devices.snapshot()["tv"]["watching"] == "BT TV · streaming"
+    devices.state["box"]["app"] = "Netflix"       # a named app wins over plain "streaming"
+    assert devices.snapshot()["tv"]["watching"] == "BT TV · Netflix"
+    devices.state["box"]["app"] = None
+    devices.state["traffic"] = {"mbps": 0.1, "streaming": False}
+    assert devices.snapshot()["tv"]["watching"] == "BT TV"
