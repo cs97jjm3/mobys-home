@@ -64,3 +64,29 @@ def test_this_computer_stats():
     stats, macs = nl.this_computer()
     if stats is not None:
         assert 0 <= stats["cpu"] <= 100 and stats["uptime"] > 0
+
+
+def test_helper_figures(tmp_path):
+    import asyncio, aiohttp
+    from aiohttp import web
+
+    async def stats(request):
+        return web.json_response({"cpu": 7, "memory": 40, "disk_free_gb": 12, "disk_used": 60,
+                                  "uptime": 3600, "temp": 52.1})
+
+    async def main():
+        app = web.Application(); app.router.add_get("/stats", stats)
+        runner = web.AppRunner(app); await runner.setup()
+        await web.TCPSite(runner, "127.0.0.1", 8097).start()
+        net = nl.HomeNetwork("hub", {}, {"Raspberry Pi": "b8:27:eb:6b:c4:7d", "Laptop": "aa:aa:aa:aa:aa:aa"})
+        body = ("{mac:'b8%3A27%3Aeb%3A6b%3Ac4%3A7d',hostname:'raspberrypi',ip:'127.0.0.1',activity:'1'}"
+                "{mac:'aa%3Aaa%3Aaa%3Aaa%3Aaa%3Aaa',hostname:'laptop',ip:'127.0.0.9',activity:'1'}")
+        net.update(nl.parse_hub(body), 1000)
+        async with aiohttp.ClientSession() as s:
+            await net._ask_helpers(s)
+        await runner.cleanup()
+        return net.snapshot()["computers"]
+
+    pi, laptop = asyncio.run(main())
+    assert pi["stats"]["temp"] == 52.1 and pi["stats"]["disk_free_gb"] == 12
+    assert "stats" not in laptop      # no helper there

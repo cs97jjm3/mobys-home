@@ -19,6 +19,7 @@ import aiohttp
 
 OUT_AFTER = 10 * 60      # seconds a phone must be gone before we say "out"
 BUSY_MBPS = 2.0          # a computer moving more than this is "busy"
+HELPER_PORT = 8097       # where moby_agent.py answers on each computer
 
 
 def clean_mac(mac):
@@ -86,6 +87,8 @@ class HomeNetwork:
         self.error = None
         self.updated = None
         self.local_stats, self.local_macs = None, set()
+        self.remote_stats = {}      # mac -> figures from that computer's helper
+        self.no_helper_until = {}
 
     @property
     def enabled(self):
@@ -107,6 +110,32 @@ class HomeNetwork:
             self.local_stats, self.local_macs = await asyncio.to_thread(this_computer)
         except Exception:
             self.local_stats, self.local_macs = None, set()
+        await self._ask_helpers(session)
+
+    async def _ask_helpers(self, session):
+        """Ask the Moby's Home helper on each computer that's on for its figures."""
+        jobs = []
+        for name, mac in self.computers.items():
+            d = self.devices.get(mac, {})
+            if not d.get("connected"):
+                self.remote_stats.pop(mac, None)
+                continue
+            if mac in self.local_macs or not d.get("ip"):
+                continue
+            if time.time() < self.no_helper_until.get(mac, 0):
+                continue
+            jobs.append(self._ask_one(session, mac, d["ip"]))
+        if jobs:
+            await asyncio.gather(*jobs)
+
+    async def _ask_one(self, session, mac, ip):
+        try:
+            async with session.get(f"http://{ip}:{HELPER_PORT}/stats",
+                                   timeout=aiohttp.ClientTimeout(total=2.5)) as r:
+                self.remote_stats[mac] = await r.json(content_type=None)
+        except Exception:
+            self.remote_stats.pop(mac, None)
+            self.no_helper_until[mac] = time.time() + 5 * 60   # no helper there: ask again in 5 minutes
 
     def update(self, devices, now):
         """Work out who's home and how busy each computer is. Separate so it can be tested."""
@@ -150,6 +179,8 @@ class HomeNetwork:
                     "ip": d.get("ip") if on else None, "link": d.get("link"),
                     "last_seen": d.get("last_seen") if not on else None}
             if mac in self.local_macs and self.local_stats:
-                item["stats"] = self.local_stats
+                item["stats"] = dict(self.local_stats, here=True)
+            elif on and mac in self.remote_stats:
+                item["stats"] = self.remote_stats[mac]
             computers.append(item)
         return {"people": people, "computers": computers, "error": self.error, "updated": self.updated}

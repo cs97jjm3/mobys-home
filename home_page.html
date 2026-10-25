@@ -119,6 +119,13 @@
   .head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 16px; }
   .title { font: 650 17px/1.2 var(--display); margin: 0; display: flex; align-items: center; gap: 10px; letter-spacing: -.01em; }
   .sub { font-size: 13px; color: var(--muted); margin: 0; }
+  .fold { display: flex; align-items: center; gap: 10px; border: 0; background: none; padding: 0; margin: 0;
+          color: inherit; cursor: pointer; text-align: left; min-width: 0; }
+  .fold .chev { width: 18px; height: 18px; color: var(--faint); transition: transform .2s; flex: none; }
+  .fold:hover .chev { color: var(--ink); }
+  .card.folded > :not(.head) { display: none; }
+  .card.folded .head { margin-bottom: 0; }
+  .card.folded .fold .chev { transform: rotate(-90deg); }
   .bub { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; flex: none;
          background: color-mix(in srgb, var(--hue, var(--blue)) 15%, transparent); color: var(--hue, var(--blue)); }
   .bub svg { width: 18px; height: 18px; }
@@ -219,7 +226,7 @@
   .pc .st { font-size: 12px; color: var(--muted); }
   .pc .r { margin-left: auto; text-align: right; font-size: 13px; color: var(--muted); }
   .pc.busy .r { color: var(--pc); font-weight: 650; }
-  .meters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+  .meters { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; margin-top: 10px; }
   .meter { font-size: 12px; color: var(--muted); }
   .meter b { display: block; font: 600 15px var(--display); color: var(--ink); }
   .meter i { display: block; height: 5px; border-radius: 99px; background: var(--line); margin-top: 5px; overflow: hidden; }
@@ -344,6 +351,7 @@ const ICONS = {
   history: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>',
   spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg>',
   echo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
+  chev: '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
   shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/></svg>',
 };
 
@@ -422,7 +430,26 @@ function drawHello() {
     ${faces ? `<div class="faces">${faces}</div>` : ""}
     <div class="clock">${now.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}</div>`;
 }
-const head = (cls, icon, title, sub) => `<div class="head"><p class="title"><span class="bub">${ICONS[icon]}</span>${title}</p>${sub ? `<p class="sub">${sub}</p>` : ""}</div>`;
+// Click a card's title to fold it away; each phone or laptop remembers its own folded cards
+function folded() { try { return new Set(JSON.parse(localStorage.getItem("mh-folded") || "[]")); } catch (e) { return new Set(); } }
+function fold(key) {
+  const f = folded();
+  f.has(key) ? f.delete(key) : f.add(key);
+  try { localStorage.setItem("mh-folded", JSON.stringify([...f])); } catch (e) {}
+  applyFolds();
+}
+function applyFolds() {
+  const f = folded();
+  document.querySelectorAll(".head[data-key]").forEach(h => {
+    const shut = f.has(h.dataset.key);
+    h.parentElement.classList.toggle("folded", shut);
+    h.querySelector(".fold").setAttribute("aria-expanded", String(!shut));
+  });
+}
+const head = (key, icon, title, sub) => `<div class="head" data-key="${key}">
+  <button class="fold" onclick="fold('${key}')" aria-expanded="true" title="Show or hide">
+    <span class="bub">${ICONS[icon]}</span><span class="title">${title}</span>${ICONS.chev}</button>
+  ${sub ? `<p class="sub">${sub}</p>` : ""}</div>`;
 
 function render() {
   const d = state.data;
@@ -434,13 +461,14 @@ function render() {
     <div class="layout">
       <div class="col">
         <div class="card c-lights">
-          ${head("", "Light", "Lights and plugs", `${a.switches.filter(s => s.power === "ON").length} on`)}
+          ${head("lights", "Light", "Lights and plugs", `${a.switches.filter(s => s.power === "ON").length} on`)}
           ${a.switches.length ? `<div class="grid">${a.switches.map(switchTile).join("")}</div>`
             : '<p class="empty">No lights or plugs found in Alexa yet.</p>'}
         </div>
         ${mediaCard(d.devices, d.casts)}
+        <div class="card c-echo">${head("echo", "echo", "Echos")}${echoList(a)}</div>
         <div class="card c-routines">
-          ${head("", "spark", "Routines", "Tap to run")}
+          ${head("routines", "spark", "Routines", "Tap to run")}
           ${a.routines.length ? `<div class="routines">${a.routines.map(r =>
             `<button onclick='runRoutine(${JSON.stringify(r).replace(/'/g, "&#39;")})'>${esc(r.replace(/^alexa,\s*/i, ""))}</button>`).join("")}</div>`
             : '<p class="empty">No routines found.</p>'}
@@ -449,10 +477,10 @@ function render() {
       <div class="col">
         ${weatherCard(d.weather)}
         ${homeCard(d.home)}
-        <div class="card c-echo">${head("", "echo", "Echos")}${echoList(a)}</div>
-        <div class="card c-log">${head("", "history", "Recent changes")}${logList(d.log)}</div>
+        <div class="card c-log">${head("log", "history", "Recent changes")}${logList(d.log)}</div>
       </div>
     </div>`;
+  applyFolds();
   if (a.error) message("Alexa: " + a.error, true);
 }
 
@@ -531,7 +559,7 @@ function mediaCard(dev, casts) {
   if (dev.tv) parts.push(tvTile(dev.tv));
   if (dev.ps5) parts.push(consoleTile(dev.ps5, {on: "On", rest: "Rest mode", off: "Off"}));
   if (dev.xbox) parts.push(consoleTile(dev.xbox, {on: "On", asleep: "Asleep", off: "Off"}));
-  return `<div class="card c-media">${head("", "tv", "TV and consoles")}
+  return `<div class="card c-media">${head("media", "tv", "TV and consoles")}
     ${parts.length ? `<div class="media">${parts.join("")}</div>` : ""}
     ${casts.length ? `<div class="casts">${casts.map(castTile).join("")}</div>` : ""}</div>`;
 }
@@ -664,13 +692,14 @@ function homeCard(h) {
     const meters = on && s ? `<div class="meters">
         ${meter("Processor", s.cpu + "%", s.cpu, 80)}
         ${meter("Memory", s.memory + "%", s.memory, 85)}
-        ${meter("Disk free", s.disk_free_gb + " GB", 100 - s.disk_used, 90)}
-      </div><div class="st" style="margin-top:8px">This is the PC running Moby's Home · on for ${uptime(s.uptime)}</div>` : "";
+        ${meter("Disk free", s.disk_free_gb + " GB", s.disk_used, 90)}
+        ${s.temp != null ? meter("Temperature", Math.round(s.temp) + "°C", s.temp, 70) : ""}
+      </div><div class="st" style="margin-top:8px">${s.here ? "Runs Moby's Home · " : ""}On for ${uptime(s.uptime)}</div>` : "";
     return `<div class="pc ${on ? "on" : ""} ${c.busy ? "busy" : ""}"><div class="row"><span class="ic">${pcIcon(c.name)}</span>
       <div><div class="nm">${esc(c.name)}</div><div class="st">${esc(bits)}</div></div>
       <span class="r">${word}</span></div>${meters}</div>`;
   }).join("");
-  return `<div class="card c-pcs">${head("", "laptop", "Computers", h.error ? esc(h.error) : "")}<div class="pcs" style="margin-top:0">${pcs}</div></div>`;
+  return `<div class="card c-pcs">${head("pcs", "laptop", "Computers", h.error ? esc(h.error) : "")}<div class="pcs" style="margin-top:0">${pcs}</div></div>`;
 }
 
 // ---------- weather ----------
@@ -692,11 +721,11 @@ const deg = t => t == null ? "–" : Math.round(t) + "°";
 
 function weatherCard(w) {
   if (!w) return "";
-  if (!w.now) return `<div class="card c-weather">${head("", "cloud", "Weather")}
+  if (!w.now) return `<div class="card c-weather">${head("weather", "cloud", "Weather")}
     <p class="empty">${w.error ? "Couldn't get the weather: " + esc(w.error) : "Getting the weather…"}</p></div>`;
   const t = w.today || {};
   return `<div class="card wx c-weather">
-    ${head("", "cloud", "Weather", esc(w.rain_note || ""))}
+    ${head("weather", "cloud", "Weather", esc(w.rain_note || ""))}
     <div class="wx-now">
       <span class="wx-big">${wxIcon(w.now.icon)}</span>
       <div><div class="wx-t">${deg(w.now.temp)}</div><div class="wx-d">${esc(w.now.text)}</div></div>
