@@ -34,6 +34,7 @@ from yarl import URL
 
 from alexa_link import Alexa
 from chromecast_link import Chromecasts
+from network_link import HomeNetwork
 from devices_link import Devices
 from psn_link import CHECK_EVERY as PSN_EVERY, PlayStation
 from weather_link import Weather
@@ -58,6 +59,7 @@ DEVICES = web.AppKey("devices", object)
 PSN = web.AppKey("psn", object)
 WEATHER = web.AppKey("weather", object)
 CASTS = web.AppKey("casts", object)
+NETWORK = web.AppKey("network", object)
 CONFIG = web.AppKey("config", dict)
 PIN = web.AppKey("pin", str)
 SECRET = web.AppKey("secret", str)
@@ -70,6 +72,7 @@ JOBS = web.AppKey("jobs", dict)
 
 def load_config():
     config = configparser.ConfigParser(interpolation=None)
+    config.optionxform = str      # keep names like "Claire" as typed
     if CONFIG_PATH.exists():
         config.read(CONFIG_PATH, encoding="utf-8")
         print(f"Using settings from {CONFIG_PATH.name}")
@@ -107,6 +110,9 @@ def load_config():
         "psn_npsso": get("playstation", "npsso"),
         "psn_online_id": get("playstation", "online_id"),
         "race_link": get("race", "link"),
+        "people": {k.strip(): v.strip() for k, v in config.items("people")} if config.has_section("people") else {},
+        "computers": ({k.strip(): v.strip() for k, v in config.items("computers")}
+                      if config.has_section("computers") else {}),
     }
 
 
@@ -177,6 +183,12 @@ async def background(app):
                     raise
                 except Exception as err:
                     print(f"TV and consoles: {err or 'took too long'}")
+                try:
+                    await asyncio.wait_for(app[NETWORK].refresh(s), 10)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as err:
+                    print(f"Who's home: {err or 'took too long'}")
                 await asyncio.sleep(30)
 
     async def others_loop():
@@ -312,6 +324,7 @@ def status_payload(app):
         "devices": devices_with_game(app),
         "weather": app[WEATHER].snapshot(),
         "casts": app[CASTS].snapshot(),
+        "home": app[NETWORK].snapshot(),
         "log": state.get("log", []),
     }
 
@@ -427,6 +440,7 @@ def build_app(alexa, config, pin):
     app[ALEXA] = alexa
     app[DEVICES] = Devices(config, HERE)
     app[WEATHER] = Weather(config["postcode"], HERE / "weather_location.txt")
+    app[NETWORK] = HomeNetwork(config["hub_ip"], config["people"], config["computers"])
     app[CASTS] = Chromecasts(config["cast_on"], config["cast_hosts"])
     app[PSN] = PlayStation(config["psn_npsso"], HERE / "psn_token.json", config["psn_online_id"])
     app[CONFIG] = config
