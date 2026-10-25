@@ -229,10 +229,15 @@ class HubTraffic:
 
     async def status(self, session):
         url = f"http://{self.hub_ip}/cgi/cgi_basicMyDevice.js"
-        async with session.get(url, headers={"Referer": f"http://{self.hub_ip}/"},
-                               timeout=aiohttp.ClientTimeout(total=6)) as r:
+        # The hub only answers browsers properly, so ask like one
+        headers = {"Referer": f"http://{self.hub_ip}/", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=6)) as r:
             body = await r.text(errors="replace")
         rx, now = self.parse(body, self.mac), time.time()
+        if rx is None and not getattr(self, "_warned", False):
+            self._warned = True
+            print(f"traffic: the hub's device list didn't include {self.mac} "
+                  f"({len(body)} characters came back, starting {body[:60]!r})")
         if rx is not None and self.last and now > self.last[0] and rx >= self.last[1]:
             self.mbps = (rx - self.last[1]) * 8 / (now - self.last[0]) / 1e6
         elif rx is None:
