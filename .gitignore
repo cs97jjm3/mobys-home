@@ -18,3 +18,8 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+
+# Ring sign-in and pictures
+ring_token.json
+ring_listen.json
+ring_snapshot_*.jpg
