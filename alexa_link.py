@@ -81,6 +81,10 @@ def read_features(endpoint_features):
             out["can_switch"] = True
         if name == "brightness" and "setBrightness" in ops:
             out["can_dim"] = True
+        if name == "color" and "setColor" in ops:
+            out["can_colour"] = True
+        if name == "colorTemperature" and "setColorTemperature" in ops:
+            out["can_white"] = True
         for prop in feature.get("properties") or []:
             if prop.get("error"):
                 continue
@@ -90,6 +94,10 @@ def read_features(endpoint_features):
                 out["power_changed"] = changed
             elif "brightnessStateValue" in prop:
                 out["brightness"] = prop["brightnessStateValue"]
+            elif prop.get("colorStateValue"):
+                c = prop["colorStateValue"]
+                if c.get("saturation"):          # 0 saturation means it's on white, not a colour
+                    out["hue"], out["saturation"] = round(c.get("hue") or 0), c.get("saturation")
             elif "detectionStateValue" in prop:
                 out["motion"] = prop["detectionStateValue"]
                 out["motion_changed"] = changed
@@ -343,6 +351,23 @@ class Alexa:
         await self._control(endpoint_id, "brightness", "setBrightness", {"brightness": percent})
         self.states.setdefault(endpoint_id, {})["brightness"] = percent
         self.states[endpoint_id]["power"] = "ON"
+
+    async def set_colour(self, endpoint_id, hue, saturation=1.0):
+        """Hue 0-360, saturation 0-1. Alexa wants it as {"color": {hue, saturation, brightness}}."""
+        state = self.states.setdefault(endpoint_id, {})
+        level = (state.get("brightness") or 100) / 100
+        await self._control(endpoint_id, "color", "setColor",
+                            {"color": {"hue": float(hue) % 360, "saturation": max(0.0, min(1.0, float(saturation))),
+                                       "brightness": level}})
+        state.update(hue=round(float(hue) % 360), saturation=float(saturation), kelvin=None, power="ON")
+
+    async def set_white(self, endpoint_id, kelvin):
+        """Warm to cool white, 2200 (candle) to 6500 (daylight)."""
+        kelvin = max(2200, min(6500, int(kelvin)))
+        await self._control(endpoint_id, "colorTemperature", "setColorTemperature",
+                            {"colorTemperatureInKelvin": kelvin})
+        state = self.states.setdefault(endpoint_id, {})
+        state.update(kelvin=kelvin, hue=None, saturation=None, power="ON")
 
     async def run_routine(self, name):
         names = {r.strip(): r for r in self.api.routines}

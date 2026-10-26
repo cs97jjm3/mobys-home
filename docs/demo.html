@@ -181,6 +181,11 @@
   .sw.off-line { opacity: .5; cursor: default; }
   .sw.busy { opacity: .6; cursor: wait; }
   .sw input[type=range] { width: 100%; accent-color: var(--lamp); margin: 0; }
+  .sw.wide { grid-column: span 2; }
+  .sws { display: flex; flex-wrap: wrap; gap: 7px; }
+  .swatch { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; flex: none;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,.12), 0 0 0 2px var(--card); transition: transform .12s; }
+  .swatch:hover, .swatch:focus-visible { transform: scale(1.18); outline: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15), 0 0 0 2px var(--ink); }
 
   /* ---------- TV, consoles, Chromecasts ---------- */
   .media { display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 12px; }
@@ -561,11 +566,32 @@ function switchTile(s) {
   const slider = on && s.can_dim && !off
     ? `<input type="range" min="1" max="100" value="${s.brightness ?? 100}" aria-label="Brightness"
          onclick="event.stopPropagation()" onchange="setBrightness('${s.id}', this.value)">` : "";
-  return `<button class="sw ${on && !off ? "on" : ""} ${off ? "off-line" : ""} ${busy ? "busy" : ""}"
-      ${off ? "disabled" : ""} onclick="toggle('${s.id}')" aria-pressed="${on}">
+  const swatches = on && !off && (s.can_colour || s.can_white) ? `<span class="sws">
+      ${s.can_white ? WHITES.map(([k, c, label]) => swatch(s.id, `setWhite('${s.id}', ${k})`, c, label)).join("") : ""}
+      ${s.can_colour ? COLOURS.map(([h, label]) => swatch(s.id, `setColour('${s.id}', ${h})`, `hsl(${h} 90% 56%)`, label)).join("") : ""}
+    </span>` : "";
+  // A coloured light glows in its own colour
+  const tint = on && s.hue != null ? ` style="--lamp: hsl(${s.hue} 90% 58%)"` : "";
+  return `<button class="sw ${on && !off ? "on" : ""} ${off ? "off-line" : ""} ${busy ? "busy" : ""} ${swatches ? "wide" : ""}"
+      ${off ? "disabled" : ""} onclick="toggle('${s.id}')" aria-pressed="${on}"${tint}>
     <span class="ic">${ICONS[s.label] || ICONS.Switch}</span>
-    <span class="nm">${esc(s.name)}</span>${slider}<span class="st">${status}</span></button>`;
+    <span class="nm">${esc(s.name)}</span>${slider}${swatches}<span class="st">${status}</span></button>`;
 }
+
+const WHITES = [[2700, "#ffc070", "Warm white"], [4000, "#ffe6bf", "Natural white"], [6500, "#e6efff", "Cool white"]];
+const COLOURS = [[0, "Red"], [28, "Orange"], [52, "Yellow"], [120, "Green"], [175, "Teal"], [220, "Blue"], [272, "Purple"], [320, "Pink"]];
+function swatch(id, action, colour, label) {
+  return `<span class="swatch" role="button" tabindex="0" title="${label}" aria-label="${label}" style="background:${colour}"
+    onclick="event.stopPropagation(); ${action}" onkeydown="if (event.key === 'Enter') { event.stopPropagation(); ${action} }"></span>`;
+}
+async function lightChange(id, body, what) {
+  state.busy[id] = true; render();
+  try { apply(await post("/api/switch", Object.assign({id}, body))); message(""); }
+  catch (e) { if (e.message !== "PIN needed") message(e.message, true); }
+  finally { delete state.busy[id]; render(); }
+}
+const setColour = (id, hue) => lightChange(id, {hue, saturation: 1});
+const setWhite = (id, kelvin) => lightChange(id, {kelvin});
 
 function mediaCard(dev, casts) {
   dev = dev || {};

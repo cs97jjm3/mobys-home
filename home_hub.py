@@ -340,7 +340,13 @@ async def api_switch(request):
     device_id = str(body.get("id", ""))
     name = alexa.name_of(device_id)
     try:
-        if "brightness" in body:
+        if "hue" in body:
+            await alexa.set_colour(device_id, float(body["hue"]), float(body.get("saturation", 1)))
+            log(app, f"{name} changed colour")
+        elif "kelvin" in body:
+            await alexa.set_white(device_id, int(body["kelvin"]))
+            log(app, f"{name} set to {'warm' if int(body['kelvin']) < 3500 else 'cool'} white")
+        elif "brightness" in body:
             value = int(body["brightness"])
             await alexa.set_brightness(device_id, value)
             log(app, f"{name} set to {value}%")

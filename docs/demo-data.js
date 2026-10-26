@@ -37,7 +37,8 @@
       { id: "1", name: "Lounge lamp", label: "Light", reachable: true, power: "ON", can_dim: true, brightness: 60 },
       { id: "2", name: "Kitchen lights", label: "Light", reachable: true, power: "ON", can_dim: true, brightness: 100 },
       { id: "3", name: "Fish tank", label: "Light", reachable: true, power: "ON" },
-      { id: "4", name: "Hall light", label: "Light", reachable: true, power: "OFF", can_dim: true, brightness: 40 },
+      { id: "4", name: "Landing", label: "Light", reachable: true, power: "ON", can_dim: true, brightness: 80,
+        can_colour: true, can_white: true, hue: 272, saturation: 1 },
       { id: "5", name: "Office plug", label: "Plug", reachable: true, power: "OFF" },
       { id: "6", name: "Kettle plug", label: "Plug", reachable: true, power: "OFF" },
       { id: "7", name: "Bedroom lamp", label: "Light", reachable: true, power: "OFF", can_dim: true, brightness: 30 },
@@ -111,7 +112,9 @@
     "/api/switch": async b => {
       await wait(450);
       const s = house.switches.find(x => x.id === b.id);
-      if (b.brightness != null) { s.brightness = b.brightness; note(`${s.name} set to ${b.brightness}%`); }
+      if (b.hue != null) { Object.assign(s, { hue: b.hue, power: "ON" }); note(`${s.name} changed colour`); }
+      else if (b.kelvin != null) { Object.assign(s, { hue: null, power: "ON" }); note(`${s.name} set to ${b.kelvin < 3500 ? "warm" : "cool"} white`); }
+      else if (b.brightness != null) { s.brightness = b.brightness; note(`${s.name} set to ${b.brightness}%`); }
       else { s.power = b.on ? "ON" : "OFF"; note(`${s.name} turned ${b.on ? "on" : "off"}`); }
       return status();
     },
