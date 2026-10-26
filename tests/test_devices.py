@@ -59,3 +59,32 @@ def test_asks_a_pretend_ps5_from_the_right_port():
         finally:
             transport.close()
     asyncio.run(main())
+
+
+def test_tv_keeps_connection_open(tmp_path):
+    import asyncio
+    import devices_link as dl
+
+    class Fake:
+        opened = 0
+        def open(self): Fake.opened += 1
+        def close(self): pass
+        def send_key(self, key):
+            if key == "BROKEN":
+                raise ConnectionError("dropped")
+            return key
+
+    tv = dl.SamsungTV("1.2.3.4", "", tmp_path / "token.txt")
+    tv._remote = lambda timeout=8: Fake()
+
+    async def go():
+        await tv._run(lambda r: r.send_key("KEY_VOLUP"))
+        await tv._run(lambda r: r.send_key("KEY_VOLUP"))
+        assert Fake.opened == 1                      # second press reused the connection
+        try:
+            await tv._run(lambda r: r.send_key("BROKEN"))
+        except ConnectionError:
+            pass
+        assert Fake.opened == 2                      # dropped: reopened once, then gave up
+        assert await tv._run(lambda r: r.send_key("KEY_MUTE")) == "KEY_MUTE"
+    asyncio.run(go())

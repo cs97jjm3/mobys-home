@@ -265,6 +265,9 @@ class SamsungTV:
     def __init__(self, ip, mac, token_file, default_source=""):
         self.ip, self.mac = ip, mac
         self.default_source = default_source   # what's on when no app is showing, e.g. "BT TV"
+        self._conn = None                      # the open remote-control connection, kept between presses
+        self._conn_lock = asyncio.Lock()
+        self._last_used = 0
         self.token_file = Path(token_file)
         self.apps = []
         self.apps_fetched = 0
@@ -347,20 +350,44 @@ class SamsungTV:
         return showing
 
     async def _run(self, action, timeout=8):
+        """Send something to the TV. The connection is kept open between presses, because opening
+        a new one each time is what makes the TV slow to respond. If it has dropped, open it again."""
         def work():
-            remote = self._remote(timeout)
+            for attempt in (1, 2):
+                if self._conn is None:
+                    self._conn = self._remote(timeout)
+                    self._conn.open()
+                try:
+                    return action(self._conn)
+                except Exception:
+                    self._close_quietly()
+                    if attempt == 2:
+                        raise
+
+        async with self._conn_lock:
             try:
-                return action(remote)
-            finally:
-                remote.close()
+                result = await asyncio.to_thread(work)
+                self.needs_allow = False
+                self._last_used = time.time()
+                return result
+            except Exception:
+                if not self.token_file.exists():
+                    self.needs_allow = True
+                raise
+
+    def _close_quietly(self):
         try:
-            result = await asyncio.to_thread(work)
-            self.needs_allow = False
-            return result
+            if self._conn is not None:
+                self._conn.close()
         except Exception:
-            if not self.token_file.exists():
-                self.needs_allow = True
-            raise
+            pass
+        self._conn = None
+
+    async def tidy(self):
+        """Close the TV connection after 10 minutes unused, so it isn't held open forever."""
+        if self._conn is not None and time.time() - self._last_used > 600:
+            async with self._conn_lock:
+                await asyncio.to_thread(self._close_quietly)
 
     async def _load_apps_quietly(self):
         try:
@@ -419,6 +446,7 @@ class Devices:
         jobs, names = [], []
         if self.tv:
             jobs.append(self.tv.status(session)); names.append("tv")
+            await self.tv.tidy()
         if self.box:
             jobs.append(self.box.status(session)); names.append("box")
         if self.traffic:
