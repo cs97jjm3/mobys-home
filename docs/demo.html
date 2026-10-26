@@ -8,12 +8,12 @@
 <meta property="og:description" content="Have a click around a pretend house: lights, Echos, TV, consoles and weather.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://cs97jjm3.github.io/mobys-home/demo.html">
-<meta property="og:image" content="https://cs97jjm3.github.io/mobys-home/social-night.png">
+<meta property="og:image" content="https://cs97jjm3.github.io/mobys-home/social-night-2.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Moby's Home: one page for the whole house, with a picture of the dashboard">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://cs97jjm3.github.io/mobys-home/social-night.png">
+<meta name="twitter:image" content="https://cs97jjm3.github.io/mobys-home/social-night-2.png">
 <meta name="theme-color" content="#1c5cab">
 <meta name="apple-mobile-web-app-title" content="Moby's Home">
 <meta name="mobile-web-app-capable" content="yes">
@@ -295,6 +295,58 @@
           background: var(--card); color: var(--muted); border-radius: 999px; padding: 5px 11px; cursor: pointer; }
   .chip.on { background: #3b3f73; border-color: #3b3f73; color: #fff; }
 
+  /* ---------- Ring doorbell ---------- */
+  .c-door { --hue: var(--race); }
+  .ring-top { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .day { margin-top: 16px; }
+  .day-bar { position: relative; height: 34px; border-radius: 10px; background: var(--raised); overflow: hidden; }
+  .mark { position: absolute; display: block; width: 3px; border-radius: 2px; transform: translateX(-50%); }
+  .day-bar .mark.motion { top: 13px; height: 8px; background: var(--faint); opacity: .7; }
+  .day-bar .mark.press { top: 5px; height: 24px; width: 4px; background: var(--race); box-shadow: 0 0 8px color-mix(in srgb, var(--race) 70%, transparent); }
+  .day-bar .now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); opacity: .35; }
+  .day-hours { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); margin-top: 4px; }
+  .day-key { display: flex; gap: 16px; font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .day-key .mark { position: static; display: inline-block; transform: none; vertical-align: -2px; margin-right: 4px; }
+  .day-key .mark.press { width: 4px; height: 14px; background: var(--race); }
+  .day-key .mark.motion { width: 3px; height: 8px; background: var(--faint); vertical-align: 0; }
+  .ring-ctrls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .chip.on-ok { border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); color: var(--ok); }
+  #door-banner { position: fixed; left: 50%; top: 18px; transform: translate(-50%, -140%); z-index: 50;
+    display: flex; align-items: center; gap: 14px; padding: 14px 16px 14px 14px; border-radius: 20px;
+    background: var(--race); color: #fff; box-shadow: 0 18px 50px -10px color-mix(in srgb, var(--race) 70%, transparent);
+    transition: transform .35s cubic-bezier(.2,.9,.3,1.2); max-width: calc(100vw - 32px); }
+  #door-banner.show { transform: translate(-50%, 0); }
+  #door-banner .db-ic { width: 42px; height: 42px; border-radius: 14px; background: rgba(255,255,255,.2); display: grid; place-items: center; flex: none; }
+  #door-banner .db-ic svg { width: 24px; height: 24px; }
+  #door-banner b { display: block; font: 650 18px/1.2 var(--display); }
+  #door-banner span { font-size: 13px; opacity: .9; }
+  #door-banner button { border: 0; background: #fff; color: var(--race); font-weight: 700; border-radius: 999px; padding: 8px 16px; cursor: pointer; }
+  @media (prefers-reduced-motion: reduce) { #door-banner { transition: none; } }
+  #door-banner .db-live { background: rgba(255,255,255,.2); color: #fff; }
+  .chip.live-btn { background: var(--race); border-color: var(--race); color: #fff; font-weight: 600; }
+  #liveview { position: fixed; inset: 0; z-index: 60; background: rgba(5, 10, 20, .72); backdrop-filter: blur(6px);
+              display: grid; place-items: center; padding: 16px; }
+  .lv-card { width: min(760px, 100%); background: var(--card); border: 1px solid var(--line); border-radius: 24px;
+             overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+  .lv-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; }
+  .lv-head b { font: 650 17px var(--display); }
+  .lv-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--race); color: #fff; font: 700 12px var(--body);
+              letter-spacing: .04em; padding: 4px 9px; border-radius: 999px; }
+  .lv-badge i { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: lvpulse 1.2s infinite; }
+  @keyframes lvpulse { 50% { opacity: .25; } }
+  .lv-left { margin-left: auto; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .lv-x { border: 0; background: var(--raised); color: var(--ink); width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 15px; }
+  .lv-video { position: relative; background: #000; aspect-ratio: 16 / 9; }
+  .lv-video video { width: 100%; height: 100%; display: block; object-fit: contain; }
+  .lv-msg { position: absolute; inset: 0; display: grid; place-items: center; color: #dfe6f2; font-size: 15px; text-align: center; padding: 20px; }
+  .lv-foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; flex-wrap: wrap; }
+  .lv-foot button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--raised);
+                    color: var(--ink); border-radius: 999px; padding: 8px 14px; cursor: pointer; font-size: 14px; }
+  .lv-foot svg { width: 16px; height: 16px; }
+  #lv-shot a { display: inline-flex; align-items: center; gap: 8px; color: var(--blue); font-size: 14px; font-weight: 600; }
+  #lv-shot img { width: 54px; height: 30px; object-fit: cover; border-radius: 6px; }
+  @media (prefers-reduced-motion: reduce) { .lv-badge i { animation: none; } }
+
   /* ---------- routines ---------- */
   .routines { display: flex; flex-wrap: wrap; gap: 8px; }
   .routines button { font-size: 14px; border: 1px solid color-mix(in srgb, var(--sky) 30%, var(--line));
@@ -325,10 +377,12 @@
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   .demo-bar { background: var(--ink); color: var(--card); text-align: center; font-size: 13px; padding: 8px 16px; }
   .demo-bar a { color: inherit; font-weight: 600; }
+  .demo-bar button { margin: 0 10px; border: 0; border-radius: 999px; padding: 4px 12px; background: var(--race); color: #fff; font: 600 13px var(--body); cursor: pointer; }
 </style>
 </head>
 <body>
 <div class="demo-bar">Demo with a pretend house. Everything works, nothing is real.
+  <button onclick="demoRing()">Ring the doorbell</button>
   <a href="./">About Moby's Home</a> · <a href="https://github.com/cs97jjm3/mobys-home">Code on GitHub</a></div>
 <header class="bar">
   <div class="brand"><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="mh-home" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b8fe0"/><stop offset="1" stop-color="#1c5cab"/></linearGradient></defs><rect width="512" height="512" rx="116" fill="url(#mh-home)"/><path d="M256 118 L392 236 C 400 243, 396 256, 385 256 L 364 256 L 364 372 C 364 384, 356 392, 344 392 L 168 392 C 156 392, 148 384, 148 372 L 148 256 L 127 256 C 116 256, 112 243, 120 236 Z" fill="#fff"/><path d="M226 392 L226 318 C226 306, 234 298, 246 298 L266 298 C278 298, 286 306, 286 318 L286 392 Z" fill="url(#mh-home)"/><circle cx="256" cy="210" r="22" fill="#f5823f"/></svg><h1>Moby's Home</h1></div>
@@ -373,6 +427,8 @@ const ICONS = {
   spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg>',
   echo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
   chev: '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  video: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3z"/></svg>',
+  camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
   shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/></svg>',
 };
 
@@ -478,7 +534,7 @@ function render() {
   const a = d.alexa;
   drawHello();
   $("app").innerHTML = `
-    <div class="tiles">${heatingTile(d.heating)}${raceTile(d.race)}${doorTiles(a.sensors)}</div>
+    <div class="tiles">${heatingTile(d.heating)}${raceTile(d.race)}${d.ring ? ringTile(d.ring) + doorTiles(a.sensors.filter(s => s.kind === "SECURITY_PANEL"), 1) : doorTiles(a.sensors, 2)}</div>
     <div class="layout">
       <div class="col">
         <div class="card c-lights">
@@ -496,6 +552,7 @@ function render() {
         </div>
       </div>
       <div class="col">
+        ${ringCard(d.ring)}
         ${weatherCard(d.weather)}
         ${homeCard(d.home)}
         <div class="card c-log">${head("log", "history", "Recent changes")}${logList(d.log)}</div>
@@ -536,9 +593,9 @@ function raceTile(r) {
     <div class="s">Open the pit wall</div></a>`;
 }
 
-function doorTiles(sensors) {
-  const shown = sensors.slice(0, 2);
-  while (shown.length < 2) shown.push(null);
+function doorTiles(sensors, count) {
+  const shown = sensors.slice(0, count);
+  while (shown.length < count) shown.push(null);
   return shown.map(s => {
     if (!s) return `<div class="tile t-door" style="padding:16px 18px"><div class="k"><span class="bub">${ICONS.door}</span>Front door</div>
       <div class="v">–</div><div class="s">No door sensors found</div></div>`;
@@ -712,6 +769,173 @@ async function echo(serial, action, value) {
   catch (e) { if (e.message !== "PIN needed") message(e.message, true); }
 }
 
+// ---------- Ring doorbell ----------
+function ringTile(r) {
+  const pressedLately = r.last_press && nowSec() - r.last_press < 600;
+  const big = r.live && r.live.kind === "press" ? `<span class="dot alert"></span> At the door`
+    : pressedLately ? `<span class="dot alert"></span> Pressed ${ago(r.last_press)}`
+    : `<span class="dot ok"></span> All quiet`;
+  const small = [r.battery != null ? `Battery ${r.battery}%` : "", `${r.presses} press${r.presses === 1 ? "" : "es"} today`].filter(Boolean).join(" · ");
+  return `<div class="tile t-door" style="padding:16px 18px"><div class="k"><span class="bub">${ICONS.bell}</span>${esc(r.name || "Front door")}</div>
+    <div class="v word">${big}</div><div class="s">${small}</div></div>`;
+}
+
+function ringCard(r) {
+  if (!r) return "";
+  const hours = [0, 6, 12, 18, 24];
+  const day0 = new Date(); day0.setHours(0, 0, 0, 0);
+  const marks = (r.timeline || []).map(e => {
+    const pct = Math.min(100, Math.max(0, (e.ts * 1000 - day0) / 864000));
+    return `<i class="mark ${e.kind}" style="left:${pct}%" title="${e.kind === "press" ? "Doorbell pressed" : "Motion"} ${clock(e.ts)}"></i>`;
+  }).join("");
+  const nowPct = (Date.now() - day0) / 864000;
+  const battery = r.battery != null ? `<div class="meter">Battery<b>${r.battery}%</b><i><span class="${r.battery <= 20 ? "hot" : ""}" style="width:${r.battery}%"></span></i></div>` : "";
+  const quiet = r.quiet_until
+    ? `<button class="chip on" onclick="ring('quiet_off')">${ICONS.moon} Quiet until ${clock(r.quiet_until)}</button>`
+    : `<button class="chip" onclick="ring('quiet_on')" title="Do Not Disturb on every Echo for an hour">${ICONS.moon} Quiet hour</button>`;
+  const motion = r.motion_on === false
+    ? `<button class="chip" onclick="ring('motion_on')">Motion alerts off</button>`
+    : `<button class="chip on-ok" onclick="ring('motion_off')">Motion alerts on</button>`;
+  return `<div class="card c-door">${head("ring", "bell", esc(r.name || "Front door"), r.error ? esc(r.error) : "")}
+    <div class="ring-top">
+      <div class="meter">Last press<b>${r.last_press ? ago(r.last_press) : "–"}</b></div>
+      <div class="meter">Last motion<b>${r.last_motion ? ago(r.last_motion) : "–"}</b></div>
+      ${battery}
+    </div>
+    <div class="day">
+      <div class="day-bar">${marks}<i class="now" style="left:${nowPct}%"></i></div>
+      <div class="day-hours">${hours.map(h => `<span>${String(h).padStart(2, "0")}</span>`).join("")}</div>
+      <div class="day-key"><span><i class="mark press"></i> ${r.presses} press${r.presses === 1 ? "" : "es"}</span>
+        <span><i class="mark motion"></i> ${r.motions} motion</span></div>
+    </div>
+    <div class="ring-ctrls"><button class="chip live-btn" onclick="openLiveView()">${ICONS.video} Live view</button>${motion}${quiet}</div></div>`;
+}
+
+async function ring(action) {
+  try { apply(await post("/api/ring", {action})); message(""); }
+  catch (e) { if (e.message !== "PIN needed") message(e.message, true); }
+}
+
+// A soft two-note chime, made in the browser, so there's no sound file to load
+function chime() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [[659, 0], [523, 0.45]].forEach(([freq, at]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "sine"; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + at);
+      g.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + at + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + at + 1.2);
+      o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + at); o.stop(ctx.currentTime + at + 1.3);
+    });
+  } catch (e) {}
+}
+
+function showDoorBanner(ts) {
+  let b = $("door-banner");
+  if (!b) { b = document.createElement("div"); b.id = "door-banner"; document.body.appendChild(b); }
+  b.innerHTML = `<span class="db-ic">${ICONS.bell}</span><div><b>Someone's at the front door</b><span>Pressed at ${clock(ts)}</span></div>
+    <button class="db-live" onclick="this.parentElement.remove(); openLiveView()">Live view</button>
+    <button onclick="this.parentElement.remove()">OK</button>`;
+  b.className = "";
+  requestAnimationFrame(() => requestAnimationFrame(() => b.className = "show"));
+  clearTimeout(showDoorBanner.timer);
+  showDoorBanner.timer = setTimeout(() => b.remove(), 120000);
+}
+
+// Ask every few seconds whether the doorbell has gone, so the banner is near-instant
+const ringWatch = { last: null };
+async function watchDoor() {
+  if (state.locked || !state.data || !state.data.ring) return;
+  try {
+    const r = await (await fetch("/api/ring/live")).json();
+    const live = r.live;
+    if (live && ringWatch.last !== null && live.id !== ringWatch.last) {
+      if (live.kind === "press") { showDoorBanner(live.ts); chime(); }
+      load();
+    }
+    ringWatch.last = live ? live.id : 0;
+  } catch (e) {}
+}
+
+// ---------- live view: the browser talks video straight to Ring; the dashboard only passes messages ----------
+const lv = {};
+const viewPost = body => fetch("/api/ring/view", {method: "POST", headers: {"Content-Type": "application/json"},
+  body: JSON.stringify(body)}).then(r => r.json());
+
+async function openLiveView() {
+  closeLiveView();
+  const box = document.createElement("div");
+  box.id = "liveview";
+  box.innerHTML = `<div class="lv-card" role="dialog" aria-label="Front door live view">
+    <div class="lv-head"><span class="lv-badge"><i></i>LIVE</span><b>${esc((state.data.ring && state.data.ring.name) || "Front door")}</b>
+      <span class="lv-left" id="lv-left"></span><button class="lv-x" onclick="closeLiveView()" aria-label="Close">✕</button></div>
+    <div class="lv-video"><video id="lv-video" autoplay playsinline muted></video><div class="lv-msg" id="lv-msg">Waking the doorbell…</div></div>
+    <div class="lv-foot"><button onclick="lvSound(this)">${ICONS.speaker} Sound on</button>
+      <button onclick="lvPicture()">${ICONS.camera} Take picture</button><span id="lv-shot"></span></div></div>`;
+  box.addEventListener("click", e => { if (e.target === box) closeLiveView(); });
+  document.body.appendChild(box);
+  try {
+    const pc = new RTCPeerConnection({iceServers: [{urls: "stun:stun.l.google.com:19302"}]});
+    lv.pc = pc; lv.pending = []; lv.id = null;
+    pc.addTransceiver("video", {direction: "recvonly"});
+    pc.addTransceiver("audio", {direction: "recvonly"});
+    pc.ontrack = e => { const v = $("lv-video"); if (v && !v.srcObject) v.srcObject = e.streams[0]; };
+    pc.onicecandidate = e => {
+      if (!e.candidate) return;
+      const c = {candidate: e.candidate.candidate, index: e.candidate.sdpMLineIndex};
+      lv.id ? viewPost({step: "candidate", id: lv.id, ...c}) : lv.pending.push(c);
+    };
+    pc.onconnectionstatechange = () => {
+      if (["failed", "closed"].includes(pc.connectionState)) lvSay("The live view dropped. Close and try again.");
+    };
+    $("lv-video").onplaying = () => lvSay("");
+    await pc.setLocalDescription(await pc.createOffer());
+    const r = await viewPost({step: "start", offer: pc.localDescription.sdp});
+    if (!r.ok) throw new Error(r.error);
+    lv.id = r.id;
+    await pc.setRemoteDescription({type: "answer", sdp: r.answer});
+    lv.pending.forEach(c => viewPost({step: "candidate", id: lv.id, ...c}));
+    lv.ends = Date.now() + r.max_seconds * 1000;
+    lv.poll = setInterval(async () => {
+      if (!lv.id) return;
+      const m = await viewPost({step: "messages", id: lv.id});
+      (m.candidates || []).forEach(c => pc.addIceCandidate({candidate: c.candidate, sdpMLineIndex: c.index}).catch(() => {}));
+      if (m.closed) { lvSay("The doorbell ended the live view."); clearInterval(lv.poll); }
+    }, 1000);
+    lv.keep = setInterval(() => lv.id && viewPost({step: "keep_alive", id: lv.id}), 20000);
+    lv.tick = setInterval(() => {
+      const left = Math.max(0, Math.round((lv.ends - Date.now()) / 1000));
+      const el = $("lv-left"); if (el) el.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`;
+      if (!left) closeLiveView();
+    }, 1000);
+  } catch (e) {
+    lvSay("Couldn't start the live view: " + (e.message || e));
+  }
+}
+function lvSay(text) { const m = $("lv-msg"); if (m) { m.textContent = text; m.style.display = text ? "" : "none"; } }
+function lvSound(btn) {
+  const v = $("lv-video"); if (!v) return;
+  v.muted = !v.muted; btn.innerHTML = `${ICONS.speaker} ${v.muted ? "Sound on" : "Sound off"}`;
+}
+function lvPicture() {
+  const v = $("lv-video");
+  if (!v || !v.videoWidth) return;
+  const c = document.createElement("canvas"); c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext("2d").drawImage(v, 0, 0);
+  const url = c.toDataURL("image/jpeg", 0.9);
+  const name = `front-door-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}.jpg`;
+  $("lv-shot").innerHTML = `<a href="${url}" download="${name}"><img src="${url}" alt="Picture just taken">Save picture</a>`;
+}
+function closeLiveView() {
+  ["poll", "keep", "tick"].forEach(k => clearInterval(lv[k]));
+  if (lv.id) viewPost({step: "stop", id: lv.id});
+  if (lv.pc) try { lv.pc.close(); } catch (e) {}
+  Object.keys(lv).forEach(k => delete lv[k]);
+  const box = $("liveview"); if (box) box.remove();
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeLiveView(); });
+
 // ---------- who's home ----------
 function pcIcon(name) {
   const n = name.toLowerCase();
@@ -822,6 +1046,8 @@ const post = (url, body) => getJSON(url, {method: "POST", headers: {"Content-Typ
 
 function apply(d) {
   state.data = d;
+  // Remember the doorbell's latest press on first load, so only new presses pop up
+  if (ringWatch.last === null && d.ring) ringWatch.last = d.ring.live ? d.ring.live.id : 0;
   state.skew = d.now - Date.now() / 1000;
   render(); stamp();
 }
@@ -870,6 +1096,7 @@ drawModes();
 load();
 setInterval(() => { if (!state.locked) load(); }, 20000);
 setInterval(() => { if (state.data) drawHello(); }, 30000);   // keep the clock and greeting current
+setInterval(watchDoor, 3000);
 </script>
 </body>
 </html>

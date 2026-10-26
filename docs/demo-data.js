@@ -80,7 +80,30 @@
         stats: { cpu: 9, memory: 34, disk_free_gb: 3, disk_used: 81, uptime: 12 * 86400, temp: 51.5 } },
       { name: "Old laptop", on: false, busy: false, mbps: null, last_seen: start - 7 * 3600 },
     ],
+    ring: { name: "Front Door", battery: 80, wifi: "good", motion_on: true, quiet_until: null,
+            events: [[25, "motion"], [26, "press"], [90, "motion"], [160, "motion"], [300, "motion"], [470, "press"], [560, "motion"]]
+              .map(([m, kind]) => ({ ts: start - m * 60, kind })) },
+    ringLive: null, ringCount: 0,
     log: [],
+  };
+
+  function ringSnapshot() {
+    const r = house.ring, day0 = new Date(); day0.setHours(0, 0, 0, 0);
+    const today = r.events.filter(e => e.ts * 1000 >= day0).sort((a, b) => b.ts - a.ts);
+    const last = k => (today.find(e => e.kind === k) || {}).ts || null;
+    const live = house.ringLive && now() - house.ringLive.ts < 120 ? house.ringLive : null;
+    return { name: r.name, battery: r.battery, wifi: r.wifi, motion_on: r.motion_on, last_press: last("press"),
+             last_motion: last("motion"), presses: today.filter(e => e.kind === "press").length,
+             motions: today.filter(e => e.kind === "motion").length, timeline: today, live, error: null,
+             quiet_until: r.quiet_until && r.quiet_until > now() ? r.quiet_until : null };
+  }
+
+  // The demo's "Ring the doorbell" button
+  window.demoRing = () => {
+    house.ringCount += 1;
+    house.ringLive = { id: house.ringCount, kind: "press", ts: now() };
+    house.ring.events.push({ ts: now(), kind: "press" });
+    note("Someone pressed the doorbell");
   };
   const wx = weather();
 
@@ -99,6 +122,7 @@
       race: { running: true, link: "https://edsf1.jmmcp.uk", port: 8080 },
       devices: { tv: house.tv, ps5: house.ps5, xbox: house.xbox },
       weather: wx,
+      ring: ringSnapshot(),
       casts: house.casts,
       home: { people: house.people, computers: house.computers, error: null, updated: now() },
       log: house.log,
@@ -140,6 +164,16 @@
       note(words[b.action] || "TV");
       return status();
     },
+    "/api/ring/live": async () => ({ ok: true, live: house.ringLive }),
+    "/api/ring": async b => {
+      await wait(400);
+      if (b.action === "motion_on" || b.action === "motion_off") {
+        house.ring.motion_on = b.action === "motion_on"; note(`Doorbell motion alerts ${house.ring.motion_on ? "on" : "off"}`);
+      }
+      if (b.action === "quiet_on") { house.ring.quiet_until = now() + 3600; note("Quiet hour started: Echos on Do Not Disturb"); }
+      if (b.action === "quiet_off") { house.ring.quiet_until = null; note("Quiet hour ended"); }
+      return status();
+    },
     "/api/cast": async b => {
       await wait(300);
       const c = house.casts.find(x => x.id === b.id);
@@ -168,6 +202,79 @@
     door.motion = door.motion === "DETECTED" ? "NOT_DETECTED" : "DETECTED";
     door.motion_changed = now();
   }, 45000);
+
+  // ---------- a pretend live view: a little animated front door, drawn in the browser ----------
+  function frontDoorScene(canvas) {
+    const g = canvas.getContext("2d"), W = canvas.width, H = canvas.height;
+    let t = 0;
+    return () => {
+      t += 1 / 15;
+      const sky = g.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0, "#1d2a44"); sky.addColorStop(1, "#3c3550");
+      g.fillStyle = sky; g.fillRect(0, 0, W, H);
+      g.fillStyle = "#6b5b52"; g.fillRect(0, H * 0.08, W, H * 0.72);                          // brick wall
+      g.strokeStyle = "rgba(0,0,0,.18)"; g.lineWidth = 2;
+      for (let y = H * 0.08; y < H * 0.8; y += 26) {
+        g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
+        for (let x = (y / 26) % 2 ? 0 : 40; x < W; x += 80) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 26); g.stroke(); }
+      }
+      const glow = 0.85 + Math.sin(t * 3) * 0.04;                                              // porch light
+      const lamp = g.createRadialGradient(W * 0.68, H * 0.2, 5, W * 0.68, H * 0.2, W * 0.45);
+      lamp.addColorStop(0, `rgba(255,200,120,${0.55 * glow})`); lamp.addColorStop(1, "rgba(255,200,120,0)");
+      g.fillStyle = lamp; g.fillRect(0, 0, W, H);
+      g.fillStyle = "#ffd88a"; g.beginPath(); g.arc(W * 0.68, H * 0.2, 14, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#3a2a24"; g.fillRect(W * 0.38, H * 0.18, W * 0.24, H * 0.62);             // door frame
+      g.fillStyle = "#7d1f2b"; g.fillRect(W * 0.4, H * 0.21, W * 0.2, H * 0.59);               // red door
+      g.fillStyle = "#e7c46a"; g.beginPath(); g.arc(W * 0.575, H * 0.52, 7, 0, Math.PI * 2); g.fill();
+      g.font = `bold ${H * 0.06}px sans-serif`; g.fillText("12", W * 0.485, H * 0.32);
+      g.fillStyle = "#8a8f96"; g.fillRect(0, H * 0.8, W, H * 0.2);                             // path
+      g.fillStyle = "#b0814f"; g.fillRect(W * 0.66, H * 0.7, W * 0.11, H * 0.12);              // a parcel
+      g.fillStyle = "#d9b98a"; g.fillRect(W * 0.66, H * 0.75, W * 0.11, H * 0.02);
+      const sway = Math.sin(t * 1.4) * 10;                                                     // a plant in the breeze
+      g.fillStyle = "#4a3b33"; g.fillRect(W * 0.18, H * 0.7, W * 0.07, H * 0.12);
+      g.fillStyle = "#3f7d4b";
+      for (let i = -2; i <= 2; i++) {
+        g.beginPath(); g.ellipse(W * 0.215 + i * 14 + sway * (1 + Math.abs(i) * 0.3), H * 0.62, 12, 46, i * 0.35 + sway / 60, 0, Math.PI * 2); g.fill();
+      }
+      g.fillStyle = "rgba(0,0,0,.45)"; g.fillRect(0, 0, W, 40);                                // camera caption
+      g.fillStyle = "#fff"; g.font = "20px sans-serif";
+      g.fillText(`Front Door   ${new Date().toLocaleString("en-GB")}   (demo)`, 16, 27);
+    };
+  }
+
+  window.addEventListener("load", () => {
+    window.openLiveView = () => {
+      closeLiveView();
+      const box = document.createElement("div");
+      box.id = "liveview";
+      box.innerHTML = `<div class="lv-card" role="dialog" aria-label="Front door live view">
+        <div class="lv-head"><span class="lv-badge"><i></i>LIVE</span><b>Front Door</b>
+          <span class="lv-left" id="lv-left"></span><button class="lv-x" onclick="closeLiveView()" aria-label="Close">✕</button></div>
+        <div class="lv-video"><video id="lv-video" autoplay playsinline muted></video><div class="lv-msg" id="lv-msg">Waking the doorbell…</div></div>
+        <div class="lv-foot"><button onclick="lvSound(this)">${ICONS.speaker} Sound on</button>
+          <button onclick="lvPicture()">${ICONS.camera} Take picture</button><span id="lv-shot"></span></div></div>`;
+      box.addEventListener("click", e => { if (e.target === box) closeLiveView(); });
+      document.body.appendChild(box);
+      const canvas = document.createElement("canvas"); canvas.width = 1280; canvas.height = 720;
+      const draw = frontDoorScene(canvas); draw();
+      lv.draw = setInterval(draw, 1000 / 15);
+      setTimeout(() => {
+        const v = document.getElementById("lv-video");
+        if (!v) return;
+        v.srcObject = canvas.captureStream ? canvas.captureStream(15) : null;
+        lvSay("");
+      }, 1200);
+      lv.ends = Date.now() + 120000;
+      lv.tick = setInterval(() => {
+        const left = Math.max(0, Math.round((lv.ends - Date.now()) / 1000));
+        const el = document.getElementById("lv-left");
+        if (el) el.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`;
+        if (!left) closeLiveView();
+      }, 1000);
+    };
+    const realClose = window.closeLiveView;
+    window.closeLiveView = () => { clearInterval(lv.draw); realClose(); };
+  });
 
   const realFetch = window.fetch.bind(window);
   window.fetch = async function (url, opts) {

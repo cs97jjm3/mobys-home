@@ -1,13 +1,13 @@
 # Moby's Home
 
-A home dashboard that runs on a Windows PC and shows everything in one place. It covers the Alexa lights and plugs, the Echos, the TV, the TV box, Chromecasts and games consoles, who's home, the computers in the house, the weather, and links to the other home dashboards. It works in a browser on the PC, on phones and tablets around the house, and from outside through a Cloudflare tunnel if you set one up.
+A home dashboard that runs on a Windows PC and shows everything in one place. It covers the Alexa lights and plugs, the Ring doorbell (with live view), the Echos, the TV, the TV box, Chromecasts and games consoles, who's home, the computers in the house, the weather, and links to the other home dashboards. It works in a browser on the PC, on phones and tablets around the house, and from outside through a Cloudflare tunnel if you set one up.
 
 Try the demo, running against a pretend house: https://cs97jjm3.github.io/mobys-home/
 
 ## What it shows
 
 - **Who's home:** each person's phone being on the home Wi-Fi shows them as home. Phones nap off the Wi-Fi to save battery, so someone only shows as out after 10 minutes away.
-- **Lights and plugs:** anything Alexa can switch, with dimming where the light supports it. The switching goes through Alexa, so there's no need for separate Tuya or Smart Life keys.
+- **Lights and plugs:** anything Alexa can switch, with dimming where the light supports it, and colour and warm-to-cool white for colour lights. A coloured light glows in its own colour on the page. The switching goes through Alexa, so there's no need for separate Tuya or Smart Life keys.
 - **Routines:** your Alexa routines as buttons.
 - **Echos:** whether each one is online, what's playing (with play, pause and skip), the volume, Do Not Disturb, and the next alarm or timer.
 - **Weather:** now, the next few hours and the next five days, from Open-Meteo. You don't need an account.
@@ -18,7 +18,7 @@ Try the demo, running against a pretend house: https://cs97jjm3.github.io/mobys-
   - PS5: on or in rest mode. It can also show which game is being played, if you link a PlayStation account.
   - Xbox: on or asleep.
 - **Computers:** on, off, busy (with the speed), Wi-Fi or cable, and when each was last seen. The PC running Moby's Home shows its processor, memory, disk space and how long it's been on. Other computers can show the same by running a small helper (see below).
-- **Ring doorbell:** a banner and chime on every open dashboard within seconds of someone pressing the bell, today's presses and motion on a timeline, battery, motion alerts on or off, a Quiet hour button (Do Not Disturb on every Echo), and optionally a colour light that glows for 10 seconds when someone rings.
+- **Ring doorbell:** a banner and chime on every open dashboard within seconds of someone pressing the bell, and a **live view** of the front door with sound and a Take picture button, no Ring Protect plan needed. Also today's presses and motion on a timeline, battery, motion alerts on or off, a Quiet hour button (Do Not Disturb on every Echo), and optionally a colour light that glows for 10 seconds when someone rings.
 - **Other dashboards:** tiles for Moby's Heat (heating) and the race weekend dashboard. Each opens in its own window.
 
 ## The look
@@ -82,11 +82,21 @@ Set `tv_box` (its address) and `tv_box_mac` (its MAC address) under `[devices]`.
 
 ## The Ring doorbell
 
-Sign in once with `py ring_test.py`. It asks for your Ring email, password and the code Ring sends you, then saves `ring_token.json` (keep it private; it's kept off GitHub). Add `py ring_test.py listen` to check live presses come through. To light up a colour light when someone rings, set `flash_light` under `[ring]` in `home_config.ini`. Without a Ring Protect plan there are no pictures or recordings, so the dashboard doesn't use any.
+Sign in once with `py ring_test.py`. It asks for your Ring email, password and the code Ring sends you, then saves `ring_token.json` (keep it private; it's kept off GitHub). Add `py ring_test.py listen` to check live presses come through. To light up a colour light when someone rings, set `flash_light` under `[ring]` in `home_config.ini`.
+
+**Live view:** tap Live view on the Front Door card (or on the doorbell banner). The video goes straight from Ring to your browser; Moby's Home only passes the set-up messages between them, so it works at home and through your own web address. It closes itself after 2 minutes to save the doorbell's battery. Take picture saves a still from the live video.
+
+Without a Ring Protect plan, a battery doorbell can't take pictures on demand and there are no recordings, so the dashboard's pictures come from live view only. The live video part of the Ring library is marked experimental.
 
 ## Samsung TV
 
-The first time the dashboard sends the TV a button press, the TV asks whether to allow it. Say yes with the TV remote. After that, the permission is remembered in `samsung_token.txt`.
+The first time the dashboard sends the TV a button press, the TV asks whether to allow it. Say yes with the TV remote. After that, the permission is remembered in `samsung_token.txt`. The connection is kept open between presses, so buttons respond quickly, and it closes after 10 minutes unused.
+
+Which app is on screen comes from a quieter check that never makes the TV ask anything. If someone pressed Deny by mistake, go to the TV's Settings > General > External Device Manager > Device Connection Manager > Device List and set Moby's Home to Allow.
+
+## Colour lights
+
+Colour and white work for any Alexa light that supports them. `py colour_test.py` lists which lights can do colour, and `py colour_test.py "Light name"` tries each way of asking Alexa on that light, which is how this was worked out.
 
 ## Checking it's all working
 

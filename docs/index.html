@@ -10,12 +10,12 @@
 <meta name="author" content="James Murrell">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://cs97jjm3.github.io/mobys-home/">
-<meta property="og:image" content="https://cs97jjm3.github.io/mobys-home/social-night.png">
+<meta property="og:image" content="https://cs97jjm3.github.io/mobys-home/social-night-2.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Moby's Home: one page for the whole house, with a picture of the dashboard">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://cs97jjm3.github.io/mobys-home/social-night.png">
+<meta name="twitter:image" content="https://cs97jjm3.github.io/mobys-home/social-night-2.png">
 <meta name="theme-color" content="#1c5cab">
 <link rel="icon" href="static/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="static/favicon-32.png" sizes="32x32" type="image/png">
@@ -71,6 +71,7 @@
   .lead { color: var(--muted); margin: 0 0 28px; max-width: 42em; }
   .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 22px 24px; box-shadow: var(--shadow); }
+  @media (min-width: 861px) { .grid .card.wide { grid-column: span 2; } }
   .card h3 { margin: 12px 0 6px; font-size: 18px; }
   .card p { margin: 0; color: var(--muted); font-size: 16px; }
   .ic { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; background: var(--soft); color: var(--blue); }
@@ -130,15 +131,17 @@
       <div class="chrome"><i></i><i></i><i></i><span>Moby's Home · demo house</span><a href="demo.html">Open full screen</a></div>
       <iframe src="demo.html" title="Moby's Home demo" loading="lazy"></iframe>
     </div>
-    <p class="caption">This is the real page, running against a pretend house. Switch the lights, run a routine, skip a song.</p>
+    <p class="caption">This is the real page, running against a pretend house. Switch the lights, change a colour, ring the doorbell, open the live view.</p>
   </div>
 
   <section id="what">
     <h2>What it does</h2>
     <p class="lead">It's the things I actually reach for. Everything updates on its own, and anything you can change, you change with one tap.</p>
     <div class="grid">
+      <div class="card wide"><span class="ic" style="color:#e8364f"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4"/></svg></span>
+        <h3>The front door</h3><p>When someone rings, every screen in the house shows it within seconds, with a chime, and a light can glow to catch your eye. Tap Live view to see who's there, with sound, and save a picture. No Ring subscription needed.</p></div>
       <div class="card"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1.1 2V16h5v-.2c.1-.8.5-1.5 1.1-2A6 6 0 0 0 12 3z"/></svg></span>
-        <h3>Lights and plugs</h3><p>Every light and plug that Alexa knows about, with dimming where the bulb can do it. It goes through Alexa, so there are no extra apps or keys to set up.</p></div>
+        <h3>Lights and plugs</h3><p>Every light and plug that Alexa knows about, with dimming, and colours and warm-to-cool white for colour bulbs. It goes through Alexa, so there are no extra apps or keys to set up.</p></div>
       <div class="card"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
         <h3>Echos</h3><p>Which ones are online, what's playing with play, pause and skip, the volume, Do Not Disturb, and the next alarm or timer.</p></div>
       <div class="card"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l3 3 6-7M19 6v12"/><circle cx="12" cy="12" r="10"/></svg></span>
@@ -153,7 +156,7 @@
         <h3>Who's home</h3><p>Everyone's phone on the home Wi-Fi shows them as home, right at the top of the page. It waits ten minutes before saying someone's out, because phones nap off the Wi-Fi.</p></div>
       <div class="card"><span class="ic" style="color:#4f5bd5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></svg></span>
         <h3>Computers</h3><p>Which computers are on, which are busy and how fast, plus processor, memory, disk space and even the Raspberry Pi's temperature.</p></div>
-      <div class="card"><span class="ic" style="color:#7b61ff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.9 1.2-1.8-.5-1.1.2-2.2 1.4-2.2H17a4 4 0 0 0 4-4c0-5.5-4-10-9-10z"/></svg></span>
+      <div class="card wide"><span class="ic" style="color:#7b61ff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.9 1.2-1.8-.5-1.1.2-2.2 1.4-2.2H17a4 4 0 0 0 4-4c0-5.5-4-10-9-10z"/></svg></span>
         <h3>Day, Night or Colour</h3><p>Pick the look that suits the room. At night, the lights that are on glow on the screen. Fold away the cards you don't use; each phone remembers its own.</p></div>
     </div>
   </section>
@@ -179,6 +182,7 @@
         <li><b>BT Smart Hub</b>Who's home, which computers are on, and when the TV box is streaming</li>
         <li><b>EE TV box</b>Whether Netflix or YouTube is running, asked the same way phone apps find it</li>
         <li><b>Chromecasts</b>Found by themselves, with what's being cast</li>
+        <li><b>Ring</b>Presses and motion pushed to the dashboard live, and the live video passed straight to your browser</li>
       </ul>
     </div>
   </section>

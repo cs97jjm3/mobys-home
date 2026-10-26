@@ -1028,6 +1028,8 @@ const post = (url, body) => getJSON(url, {method: "POST", headers: {"Content-Typ
 
 function apply(d) {
   state.data = d;
+  // Remember the doorbell's latest press on first load, so only new presses pop up
+  if (ringWatch.last === null && d.ring) ringWatch.last = d.ring.live ? d.ring.live.id : 0;
   state.skew = d.now - Date.now() / 1000;
   render(); stamp();
 }
