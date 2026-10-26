@@ -309,12 +309,9 @@ class SamsungTV:
             result = {"state": "on", "name": None, "model": None}
         else:
             result = {"state": "off", "name": None, "model": None}
-        # Fetch the app list in the background, so it never slows the status check down
-        if (result["state"] == "on" and time.time() - self.apps_fetched > 6 * 3600
-                and not getattr(self, "_loading", False)):
-            self._loading = True
-            self.apps_fetched = time.time() - 6 * 3600 + 300   # retry in 5 minutes if it fails
-            asyncio.create_task(self._load_apps_quietly())
+        # The app buttons come from the quiet on-screen check in _on_screen. We don't ask the TV
+        # for its app list over the remote connection: some TVs never answer, and every try makes
+        # the TV pop up "Allow / Deny" on screen.
         if result["state"] == "on":
             result["watching"] = await self._on_screen(session) or self.default_source or None
         result["apps"] = self.apps
