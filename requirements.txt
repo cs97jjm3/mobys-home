@@ -4,4 +4,5 @@ samsungtvws
 PSNAWP
 pychromecast
 psutil
+ring_doorbell
 pytest

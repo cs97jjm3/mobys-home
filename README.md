@@ -18,6 +18,7 @@ Try the demo, running against a pretend house: https://cs97jjm3.github.io/mobys-
   - PS5: on or in rest mode. It can also show which game is being played, if you link a PlayStation account.
   - Xbox: on or asleep.
 - **Computers:** on, off, busy (with the speed), Wi-Fi or cable, and when each was last seen. The PC running Moby's Home shows its processor, memory, disk space and how long it's been on. Other computers can show the same by running a small helper (see below).
+- **Ring doorbell:** a banner and chime on every open dashboard within seconds of someone pressing the bell, today's presses and motion on a timeline, battery, motion alerts on or off, a Quiet hour button (Do Not Disturb on every Echo), and optionally a colour light that glows for 10 seconds when someone rings.
 - **Other dashboards:** tiles for Moby's Heat (heating) and the race weekend dashboard. Each opens in its own window.
 
 ## The look
@@ -79,6 +80,10 @@ The BT / EE TV Box Pro has no public way to ask what's on, but two things work:
 
 Set `tv_box` (its address) and `tv_box_mac` (its MAC address) under `[devices]`. The scripts `bt_box_probe.py`, `bt_box_apps.py`, `bt_box_hunt.py` and `hub_rate_test.py` are the tests used to work this out.
 
+## The Ring doorbell
+
+Sign in once with `py ring_test.py`. It asks for your Ring email, password and the code Ring sends you, then saves `ring_token.json` (keep it private; it's kept off GitHub). Add `py ring_test.py listen` to check live presses come through. To light up a colour light when someone rings, set `flash_light` under `[ring]` in `home_config.ini`. Without a Ring Protect plan there are no pictures or recordings, so the dashboard doesn't use any.
+
 ## Samsung TV
 
 The first time the dashboard sends the TV a button press, the TV asks whether to allow it. Say yes with the TV remote. After that, the permission is remembered in `samsung_token.txt`.
@@ -101,3 +106,4 @@ These files hold passwords, PINs or sign-ins. The `.gitignore` keeps them off Gi
 - `alexa_login.json`
 - `psn_token.json`
 - `samsung_token.txt`
+- `ring_token.json` and `ring_listen.json`

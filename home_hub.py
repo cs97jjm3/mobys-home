@@ -35,6 +35,7 @@ from yarl import URL
 from alexa_link import Alexa
 from chromecast_link import Chromecasts
 from network_link import HomeNetwork
+from ring_link import RingDoor
 from devices_link import Devices
 from psn_link import CHECK_EVERY as PSN_EVERY, PlayStation
 from weather_link import Weather
@@ -60,6 +61,7 @@ PSN = web.AppKey("psn", object)
 WEATHER = web.AppKey("weather", object)
 CASTS = web.AppKey("casts", object)
 NETWORK = web.AppKey("network", object)
+RING = web.AppKey("ring", object)
 CONFIG = web.AppKey("config", dict)
 PIN = web.AppKey("pin", str)
 SECRET = web.AppKey("secret", str)
@@ -110,6 +112,8 @@ def load_config():
         "psn_npsso": get("playstation", "npsso"),
         "psn_online_id": get("playstation", "online_id"),
         "race_link": get("race", "link"),
+        "ring_flash_light": get("ring", "flash_light"),
+        "ring_flash_colour": (get("ring", "flash_colour") or "blue").lower(),
         "people": {k.strip(): v.strip() for k, v in config.items("people")} if config.has_section("people") else {},
         "computers": ({k.strip(): v.strip() for k, v in config.items("computers")}
                       if config.has_section("computers") else {}),
@@ -196,6 +200,10 @@ async def background(app):
         async with aiohttp.ClientSession(cookie_jar=jar,
                                          timeout=aiohttp.ClientTimeout(total=10)) as s:
             while True:
+                try:
+                    await app[RING].refresh()
+                except Exception as err:
+                    print(f"Ring: {err}")
                 try:
                     await app[WEATHER].refresh(s)
                 except Exception as err:
@@ -325,6 +333,7 @@ def status_payload(app):
         "weather": app[WEATHER].snapshot(),
         "casts": app[CASTS].snapshot(),
         "home": app[NETWORK].snapshot(),
+        "ring": app[RING].snapshot(state.get("quiet_until")),
         "log": state.get("log", []),
     }
 
@@ -433,6 +442,88 @@ async def api_cast(request):
     return web.json_response(status_payload(app))
 
 
+# ---------- Ring doorbell ----------
+
+FLASH_COLOURS = {"blue": 220, "red": 0, "green": 120, "purple": 272, "orange": 28, "pink": 320, "yellow": 52}
+
+
+async def ring_pressed(app):
+    """Someone pressed the doorbell: note it, and light up the chosen light for 10 seconds."""
+    log(app, "Someone pressed the doorbell")
+    config, alexa, state = app[CONFIG], app[ALEXA], app[STATE]
+    name = config["ring_flash_light"].strip().lower()
+    if not name or state.get("flashing"):
+        return
+    light = next((s for s in alexa.snapshot()["switches"] if s["name"].lower() == name), None)
+    if not light or not light.get("can_colour"):
+        return
+    state["flashing"] = True
+    was_on, old_hue = light.get("power") == "ON", light.get("hue")
+    try:
+        await alexa.set_colour(light["id"], FLASH_COLOURS.get(config["ring_flash_colour"], 220))
+        await asyncio.sleep(10)
+        if not was_on:
+            await alexa.switch(light["id"], False)
+        elif old_hue is not None:
+            await alexa.set_colour(light["id"], old_hue)
+        else:
+            await alexa.set_white(light["id"], 2700)
+    except Exception as err:
+        print(f"Doorbell light: {err}")
+    finally:
+        state["flashing"] = False
+
+
+async def set_quiet(app, on):
+    """Quiet hour: Do Not Disturb on every Echo (which also stops them announcing the doorbell)."""
+    alexa, state = app[ALEXA], app[STATE]
+    for echo in alexa.echos:
+        if echo.get("online"):
+            try:
+                await alexa.echo_control(echo["serial"], "dnd", on)
+            except Exception as err:
+                print(f"Quiet hour, {echo['name']}: {err}")
+    old = app[JOBS].pop("quiet", None)
+    if old:
+        old.cancel()
+    if on:
+        state["quiet_until"] = time.time() + 3600
+
+        async def end_later():
+            await asyncio.sleep(3600)
+            app[JOBS].pop("quiet", None)
+            await set_quiet(app, False)
+            log(app, "Quiet hour ended")
+        app[JOBS]["quiet"] = asyncio.create_task(end_later())
+    else:
+        state["quiet_until"] = None
+
+
+async def api_ring(request):
+    app = request.app
+    ring = app[RING]
+    action = str((await request.json()).get("action", ""))
+    try:
+        if action in ("motion_on", "motion_off"):
+            await ring.set_motion(action == "motion_on")
+            log(app, f"Doorbell motion alerts {'on' if action == 'motion_on' else 'off'}")
+        elif action in ("quiet_on", "quiet_off"):
+            await set_quiet(app, action == "quiet_on")
+            log(app, "Quiet hour started: Echos on Do Not Disturb" if action == "quiet_on" else "Quiet hour ended")
+        else:
+            raise ValueError(f"Unknown action: {action}")
+    except Exception as err:
+        log(app, f"Doorbell: couldn't do that ({err})", ok=False)
+        return web.json_response({"ok": False, "error": f"Ring didn't do that: {err}"}, status=502)
+    return web.json_response(status_payload(app))
+
+
+async def api_ring_live(request):
+    """A tiny check the page makes every few seconds, so a press shows up straight away."""
+    live = request.app[RING].live
+    return web.json_response({"ok": True, "live": live})
+
+
 async def api_refresh(request):
     try:
         await request.app[ALEXA].refresh(force=True)
@@ -446,6 +537,8 @@ def build_app(alexa, config, pin):
     app[ALEXA] = alexa
     app[DEVICES] = Devices(config, HERE)
     app[WEATHER] = Weather(config["postcode"], HERE / "weather_location.txt")
+    app[RING] = RingDoor(HERE / "ring_token.json", HERE / "ring_listen.json")
+    app[RING].on_press = lambda: ring_pressed(app)
     app[NETWORK] = HomeNetwork(config["hub_ip"], config["people"], config["computers"])
     app[CASTS] = Chromecasts(config["cast_on"], config["cast_hosts"])
     app[PSN] = PlayStation(config["psn_npsso"], HERE / "psn_token.json", config["psn_online_id"])
@@ -464,11 +557,13 @@ def build_app(alexa, config, pin):
             print(f"Alexa: first refresh failed ({err}), will keep trying")
         app[JOBS]["background"] = asyncio.create_task(background(app))
         await asyncio.to_thread(app[CASTS].start)
+        app[JOBS]["ring"] = asyncio.create_task(app[RING].start())
 
     async def on_cleanup(app):
         if "background" in app[JOBS]:
             app[JOBS]["background"].cancel()
         await asyncio.to_thread(app[CASTS].stop)
+        await app[RING].stop()
         await alexa.stop()
 
     app.on_startup.append(on_startup)
@@ -486,6 +581,8 @@ def build_app(alexa, config, pin):
     app.router.add_post("/api/tv", api_tv)
     app.router.add_post("/api/echo", api_echo)
     app.router.add_post("/api/cast", api_cast)
+    app.router.add_post("/api/ring", api_ring)
+    app.router.add_get("/api/ring/live", api_ring_live)
     return app
 
 
