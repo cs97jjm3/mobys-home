@@ -518,6 +518,32 @@ async def api_ring(request):
     return web.json_response(status_payload(app))
 
 
+async def api_ring_view(request):
+    """Live view: the page sends its video offer and messages; we pass them to and from Ring."""
+    app, ring = request.app, request.app[RING]
+    body = await request.json()
+    step = str(body.get("step", ""))
+    try:
+        if step == "start":
+            result = await ring.view_start(str(body.get("offer", "")))
+            log(app, "Front door live view opened")
+            return web.json_response(dict(result, ok=True))
+        sid = str(body.get("id", ""))
+        if step == "messages":
+            return web.json_response(dict(ring.view_messages(sid), ok=True))
+        if step == "candidate":
+            await ring.view_candidate(sid, str(body.get("candidate", "")), body.get("index", 0))
+        elif step == "keep_alive":
+            return web.json_response({"ok": True, "open": await ring.view_keep_alive(sid)})
+        elif step == "stop":
+            await ring.view_stop(sid)
+        else:
+            raise ValueError(f"Unknown step: {step}")
+        return web.json_response({"ok": True})
+    except Exception as err:
+        return web.json_response({"ok": False, "error": str(err) or err.__class__.__name__}, status=502)
+
+
 async def api_ring_live(request):
     """A tiny check the page makes every few seconds, so a press shows up straight away."""
     live = request.app[RING].live
@@ -583,6 +609,7 @@ def build_app(alexa, config, pin):
     app.router.add_post("/api/cast", api_cast)
     app.router.add_post("/api/ring", api_ring)
     app.router.add_get("/api/ring/live", api_ring_live)
+    app.router.add_post("/api/ring/view", api_ring_view)
     return app
 
 

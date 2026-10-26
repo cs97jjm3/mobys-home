@@ -14,9 +14,11 @@ Without a Ring Protect plan there are no pictures or recordings, so none are use
 import asyncio
 import json
 import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 
+VIEW_MAX = 120           # live view closes itself after 2 minutes, to save the doorbell's battery
 REFRESH_EVERY = 300      # battery and history, every 5 minutes (Ring doesn't like being asked often)
 LIVE_FOR = 120           # how long a press stays "live" on the page, in seconds
 AGENT = "MobysHome-1.0"
@@ -53,6 +55,7 @@ class RingDoor:
         self.fetched = 0
         self.error = None
         self.on_press = None      # set by the hub: called (async) when someone presses the bell
+        self.views = {}           # live view sessions: id -> {"answer", "candidates", "error", "started"}
 
     @property
     def enabled(self):
@@ -132,6 +135,70 @@ class RingDoor:
             return getter()
         except Exception:
             return None
+
+    # ----- live view -----
+    # The browser makes the video connection itself; we only pass messages between it and Ring.
+    async def view_start(self, offer):
+        if not self.bell:
+            raise RuntimeError("The doorbell isn't connected")
+        await self._close_old_views()
+        sid = uuid.uuid4().hex
+        view = {"answer": None, "candidates": [], "error": None, "started": time.time(), "ready": asyncio.Event()}
+        self.views[sid] = view
+
+        def message(m):
+            if m.answer:
+                view["answer"] = m.answer
+                view["ready"].set()
+            elif m.candidate:
+                view["candidates"].append({"candidate": m.candidate, "index": m.sdp_m_line_index or 0})
+            if m.error_code:
+                view["error"] = m.error_message or m.error_code
+                view["ready"].set()
+
+        await self.bell.generate_async_webrtc_stream(offer, sid, message, keep_alive_timeout=60)
+        try:
+            await asyncio.wait_for(view["ready"].wait(), 20)
+        except asyncio.TimeoutError:
+            view["error"] = "The doorbell didn't answer. It may be asleep: try again in a moment."
+        if view["error"] or not view["answer"]:
+            await self.view_stop(sid)
+            raise RuntimeError(view["error"] or "No answer from the doorbell")
+        servers = [{"urls": url} for url in self.bell.get_ice_servers()]
+        return {"id": sid, "answer": view["answer"], "ice_servers": servers, "max_seconds": VIEW_MAX}
+
+    def view_messages(self, sid):
+        view = self.views.get(sid)
+        if not view:
+            return {"closed": True, "candidates": []}
+        out, view["candidates"] = view["candidates"], []
+        return {"closed": False, "candidates": out, "error": view["error"]}
+
+    async def view_candidate(self, sid, candidate, index):
+        if sid in self.views:
+            await self.bell.on_webrtc_candidate(sid, candidate, int(index or 0))
+
+    async def view_keep_alive(self, sid):
+        view = self.views.get(sid)
+        if not view:
+            return False
+        if time.time() - view["started"] > VIEW_MAX:
+            await self.view_stop(sid)
+            return False
+        await self.bell.keep_alive_webrtc_stream(sid)
+        return True
+
+    async def view_stop(self, sid):
+        self.views.pop(sid, None)
+        try:
+            await self.bell.close_webrtc_stream(sid)
+        except Exception:
+            pass
+
+    async def _close_old_views(self):
+        for sid, view in list(self.views.items()):
+            if time.time() - view["started"] > VIEW_MAX:
+                await self.view_stop(sid)
 
     async def set_motion(self, on):
         await self.bell.async_set_motion_detection(bool(on))

@@ -312,6 +312,30 @@
   #door-banner span { font-size: 13px; opacity: .9; }
   #door-banner button { border: 0; background: #fff; color: var(--race); font-weight: 700; border-radius: 999px; padding: 8px 16px; cursor: pointer; }
   @media (prefers-reduced-motion: reduce) { #door-banner { transition: none; } }
+  #door-banner .db-live { background: rgba(255,255,255,.2); color: #fff; }
+  .chip.live-btn { background: var(--race); border-color: var(--race); color: #fff; font-weight: 600; }
+  #liveview { position: fixed; inset: 0; z-index: 60; background: rgba(5, 10, 20, .72); backdrop-filter: blur(6px);
+              display: grid; place-items: center; padding: 16px; }
+  .lv-card { width: min(760px, 100%); background: var(--card); border: 1px solid var(--line); border-radius: 24px;
+             overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+  .lv-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; }
+  .lv-head b { font: 650 17px var(--display); }
+  .lv-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--race); color: #fff; font: 700 12px var(--body);
+              letter-spacing: .04em; padding: 4px 9px; border-radius: 999px; }
+  .lv-badge i { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: lvpulse 1.2s infinite; }
+  @keyframes lvpulse { 50% { opacity: .25; } }
+  .lv-left { margin-left: auto; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .lv-x { border: 0; background: var(--raised); color: var(--ink); width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 15px; }
+  .lv-video { position: relative; background: #000; aspect-ratio: 16 / 9; }
+  .lv-video video { width: 100%; height: 100%; display: block; object-fit: contain; }
+  .lv-msg { position: absolute; inset: 0; display: grid; place-items: center; color: #dfe6f2; font-size: 15px; text-align: center; padding: 20px; }
+  .lv-foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; flex-wrap: wrap; }
+  .lv-foot button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--raised);
+                    color: var(--ink); border-radius: 999px; padding: 8px 14px; cursor: pointer; font-size: 14px; }
+  .lv-foot svg { width: 16px; height: 16px; }
+  #lv-shot a { display: inline-flex; align-items: center; gap: 8px; color: var(--blue); font-size: 14px; font-weight: 600; }
+  #lv-shot img { width: 54px; height: 30px; object-fit: cover; border-radius: 6px; }
+  @media (prefers-reduced-motion: reduce) { .lv-badge i { animation: none; } }
 
   /* ---------- routines ---------- */
   .routines { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -385,6 +409,8 @@ const ICONS = {
   spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg>',
   echo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
   chev: '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  video: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3z"/></svg>',
+  camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
   shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/></svg>',
 };
 
@@ -764,7 +790,7 @@ function ringCard(r) {
       <div class="day-key"><span><i class="mark press"></i> ${r.presses} press${r.presses === 1 ? "" : "es"}</span>
         <span><i class="mark motion"></i> ${r.motions} motion</span></div>
     </div>
-    <div class="ring-ctrls">${motion}${quiet}</div></div>`;
+    <div class="ring-ctrls"><button class="chip live-btn" onclick="openLiveView()">${ICONS.video} Live view</button>${motion}${quiet}</div></div>`;
 }
 
 async function ring(action) {
@@ -791,6 +817,7 @@ function showDoorBanner(ts) {
   let b = $("door-banner");
   if (!b) { b = document.createElement("div"); b.id = "door-banner"; document.body.appendChild(b); }
   b.innerHTML = `<span class="db-ic">${ICONS.bell}</span><div><b>Someone's at the front door</b><span>Pressed at ${clock(ts)}</span></div>
+    <button class="db-live" onclick="this.parentElement.remove(); openLiveView()">Live view</button>
     <button onclick="this.parentElement.remove()">OK</button>`;
   b.className = "";
   requestAnimationFrame(() => requestAnimationFrame(() => b.className = "show"));
@@ -812,6 +839,84 @@ async function watchDoor() {
     ringWatch.last = live ? live.id : 0;
   } catch (e) {}
 }
+
+// ---------- live view: the browser talks video straight to Ring; the dashboard only passes messages ----------
+const lv = {};
+const viewPost = body => fetch("/api/ring/view", {method: "POST", headers: {"Content-Type": "application/json"},
+  body: JSON.stringify(body)}).then(r => r.json());
+
+async function openLiveView() {
+  closeLiveView();
+  const box = document.createElement("div");
+  box.id = "liveview";
+  box.innerHTML = `<div class="lv-card" role="dialog" aria-label="Front door live view">
+    <div class="lv-head"><span class="lv-badge"><i></i>LIVE</span><b>${esc((state.data.ring && state.data.ring.name) || "Front door")}</b>
+      <span class="lv-left" id="lv-left"></span><button class="lv-x" onclick="closeLiveView()" aria-label="Close">✕</button></div>
+    <div class="lv-video"><video id="lv-video" autoplay playsinline muted></video><div class="lv-msg" id="lv-msg">Waking the doorbell…</div></div>
+    <div class="lv-foot"><button onclick="lvSound(this)">${ICONS.speaker} Sound on</button>
+      <button onclick="lvPicture()">${ICONS.camera} Take picture</button><span id="lv-shot"></span></div></div>`;
+  box.addEventListener("click", e => { if (e.target === box) closeLiveView(); });
+  document.body.appendChild(box);
+  try {
+    const pc = new RTCPeerConnection({iceServers: [{urls: "stun:stun.l.google.com:19302"}]});
+    lv.pc = pc; lv.pending = []; lv.id = null;
+    pc.addTransceiver("video", {direction: "recvonly"});
+    pc.addTransceiver("audio", {direction: "recvonly"});
+    pc.ontrack = e => { const v = $("lv-video"); if (v && !v.srcObject) v.srcObject = e.streams[0]; };
+    pc.onicecandidate = e => {
+      if (!e.candidate) return;
+      const c = {candidate: e.candidate.candidate, index: e.candidate.sdpMLineIndex};
+      lv.id ? viewPost({step: "candidate", id: lv.id, ...c}) : lv.pending.push(c);
+    };
+    pc.onconnectionstatechange = () => {
+      if (["failed", "closed"].includes(pc.connectionState)) lvSay("The live view dropped. Close and try again.");
+    };
+    $("lv-video").onplaying = () => lvSay("");
+    await pc.setLocalDescription(await pc.createOffer());
+    const r = await viewPost({step: "start", offer: pc.localDescription.sdp});
+    if (!r.ok) throw new Error(r.error);
+    lv.id = r.id;
+    await pc.setRemoteDescription({type: "answer", sdp: r.answer});
+    lv.pending.forEach(c => viewPost({step: "candidate", id: lv.id, ...c}));
+    lv.ends = Date.now() + r.max_seconds * 1000;
+    lv.poll = setInterval(async () => {
+      if (!lv.id) return;
+      const m = await viewPost({step: "messages", id: lv.id});
+      (m.candidates || []).forEach(c => pc.addIceCandidate({candidate: c.candidate, sdpMLineIndex: c.index}).catch(() => {}));
+      if (m.closed) { lvSay("The doorbell ended the live view."); clearInterval(lv.poll); }
+    }, 1000);
+    lv.keep = setInterval(() => lv.id && viewPost({step: "keep_alive", id: lv.id}), 20000);
+    lv.tick = setInterval(() => {
+      const left = Math.max(0, Math.round((lv.ends - Date.now()) / 1000));
+      const el = $("lv-left"); if (el) el.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`;
+      if (!left) closeLiveView();
+    }, 1000);
+  } catch (e) {
+    lvSay("Couldn't start the live view: " + (e.message || e));
+  }
+}
+function lvSay(text) { const m = $("lv-msg"); if (m) { m.textContent = text; m.style.display = text ? "" : "none"; } }
+function lvSound(btn) {
+  const v = $("lv-video"); if (!v) return;
+  v.muted = !v.muted; btn.innerHTML = `${ICONS.speaker} ${v.muted ? "Sound on" : "Sound off"}`;
+}
+function lvPicture() {
+  const v = $("lv-video");
+  if (!v || !v.videoWidth) return;
+  const c = document.createElement("canvas"); c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext("2d").drawImage(v, 0, 0);
+  const url = c.toDataURL("image/jpeg", 0.9);
+  const name = `front-door-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}.jpg`;
+  $("lv-shot").innerHTML = `<a href="${url}" download="${name}"><img src="${url}" alt="Picture just taken">Save picture</a>`;
+}
+function closeLiveView() {
+  ["poll", "keep", "tick"].forEach(k => clearInterval(lv[k]));
+  if (lv.id) viewPost({step: "stop", id: lv.id});
+  if (lv.pc) try { lv.pc.close(); } catch (e) {}
+  Object.keys(lv).forEach(k => delete lv[k]);
+  const box = $("liveview"); if (box) box.remove();
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeLiveView(); });
 
 // ---------- who's home ----------
 function pcIcon(name) {
