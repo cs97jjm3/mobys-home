@@ -605,7 +605,8 @@ function switchTile(s) {
   const slider = on && s.can_dim && !off
     ? `<input type="range" min="1" max="100" value="${s.brightness ?? 100}" aria-label="Brightness"
          onclick="event.stopPropagation()" onchange="setBrightness('${s.id}', this.value)">` : "";
-  const swatches = on && !off && (s.can_colour || s.can_white) ? `<span class="sws">
+  // Colour lights always show their colours; picking one switches the light on in that colour
+  const swatches = !off && (s.can_colour || s.can_white) ? `<span class="sws">
       ${s.can_white ? WHITES.map(([k, c, label]) => swatch(s.id, `setWhite('${s.id}', ${k})`, c, label)).join("") : ""}
       ${s.can_colour ? COLOURS.map(([h, label]) => swatch(s.id, `setColour('${s.id}', ${h})`, `hsl(${h} 90% 56%)`, label)).join("") : ""}
     </span>` : "";
