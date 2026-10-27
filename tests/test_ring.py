@@ -88,3 +88,20 @@ def test_live_view_error(tmp_path):
         assert False
     except RuntimeError as err:
         assert "busy" in str(err)
+
+
+def test_listener_restarted_when_dead(tmp_path):
+    token = tmp_path / "t.json"; token.write_text("{}")
+    door = rl.RingDoor(token, tmp_path / "l.json")
+    calls = []
+
+    class Receiver:
+        def is_started(self): return False
+
+    class Listener:
+        _receiver = Receiver()
+        async def stop(self): calls.append("stop")
+        async def start(self): calls.append("start")
+    door.listener = Listener()
+    asyncio.run(door._check_listener())
+    assert calls == ["stop", "start"]

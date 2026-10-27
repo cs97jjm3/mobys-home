@@ -35,3 +35,34 @@ def test_warns_before_the_code_runs_out():
     psn = pl.PlayStation("abc", "x.json")
     psn.state, psn.days_left = {"online": True, "game": "F1 25"}, 5
     assert "5 days" in psn.snapshot()["warning"]
+
+
+def test_access_denied_backs_off(tmp_path):
+    import asyncio, time
+    import psn_link as pl
+    ps = pl.PlayStation("code", tmp_path / "t.json", "Someone")
+    calls = []
+
+    def refused():
+        calls.append(1)
+        raise RuntimeError("<HTML><TITLE>Access Denied</TITLE> You don't have permission")
+    ps._read = refused
+    asyncio.run(ps.refresh())
+    asyncio.run(ps.refresh())                      # within 30 minutes: doesn't ask again
+    assert len(calls) == 1 and "refusing" in ps.snapshot()["warning"]
+    assert ps.wait_until > time.time() + 25 * 60
+
+
+def test_account_remembered(tmp_path):
+    import json
+    import psn_link as pl
+    token = tmp_path / "t.json"
+    ps = pl.PlayStation("code", token, "Someone")
+    ps.account_id = "123"
+
+    class Auth:
+        token_response = {"access_token": "x", "refresh_token_expires_at": 0}
+    ps.psn = type("P", (), {"authenticator": Auth()})()
+    ps._save_token()
+    saved = json.loads(token.read_text())
+    assert saved["account_id"] == "123" and saved["online_id"] == "Someone"

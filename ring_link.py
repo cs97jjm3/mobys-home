@@ -106,9 +106,28 @@ class RingDoor:
         if kind == "press" and self.on_press:
             asyncio.get_running_loop().create_task(self.on_press())
 
+    async def _check_listener(self):
+        """If the live-alert connection to Ring has given up (say after the Wi-Fi dropped), start it again."""
+        receiver = getattr(self.listener, "_receiver", None)
+        try:
+            alive = bool(receiver and receiver.is_started())
+        except Exception:
+            alive = True
+        if self.listener and not alive:
+            print("Ring: live alerts had stopped, reconnecting")
+            try:
+                await self.listener.stop()
+            except Exception:
+                pass
+            try:
+                await self.listener.start()
+            except Exception as err:
+                print(f"Ring: couldn't reconnect live alerts ({err})")
+
     async def refresh(self, force=False):
         if not self.bell or (not force and time.time() - self.fetched < REFRESH_EVERY):
             return
+        await self._check_listener()
         try:
             await self.bell.async_update()
             try:
