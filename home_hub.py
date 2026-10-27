@@ -36,6 +36,7 @@ from alexa_link import Alexa
 from chromecast_link import Chromecasts
 from network_link import HomeNetwork
 from ring_link import RingDoor
+from location_link import Locations
 from devices_link import Devices
 from psn_link import CHECK_EVERY as PSN_EVERY, PlayStation
 from weather_link import Weather
@@ -53,6 +54,7 @@ PIN_LOCKOUT_SECONDS = 5 * 60
 CONTENT_TYPES = {
     ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon",
     ".webmanifest": "application/manifest+json",
+    ".js": "text/javascript", ".css": "text/css",
 }
 
 ALEXA = web.AppKey("alexa", object)
@@ -62,6 +64,7 @@ WEATHER = web.AppKey("weather", object)
 CASTS = web.AppKey("casts", object)
 NETWORK = web.AppKey("network", object)
 RING = web.AppKey("ring", object)
+LOCS = web.AppKey("locations", object)
 CONFIG = web.AppKey("config", dict)
 PIN = web.AppKey("pin", str)
 SECRET = web.AppKey("secret", str)
@@ -112,6 +115,9 @@ def load_config():
         "psn_npsso": get("playstation", "npsso"),
         "psn_online_id": get("playstation", "online_id"),
         "race_link": get("race", "link"),
+        "loc_account": get("locations", "account"),
+        "loc_names": ({k.strip(): v.strip() for k, v in config.items("locations") if k.strip().lower() != "account"}
+                      if config.has_section("locations") else {}),
         "ring_flash_light": get("ring", "flash_light"),
         "ring_flash_colour": (get("ring", "flash_colour") or "blue").lower(),
         "people": {k.strip(): v.strip() for k, v in config.items("people")} if config.has_section("people") else {},
@@ -200,6 +206,10 @@ async def background(app):
         async with aiohttp.ClientSession(cookie_jar=jar,
                                          timeout=aiohttp.ClientTimeout(total=10)) as s:
             while True:
+                try:
+                    await app[LOCS].refresh(postcode_home=app[WEATHER].where)
+                except Exception as err:
+                    print(f"Locations: {err}")
                 try:
                     await app[RING].refresh()
                 except Exception as err:
@@ -318,6 +328,20 @@ def devices_with_game(app):
     return devices
 
 
+def with_locations(home, family):
+    """Someone is home if their phone is on the Wi-Fi or Google puts them at home; add how far away they are."""
+    if not home or not family:
+        return home
+    where = {p["name"]: p for p in family["people"]}
+    for person in home["people"]:
+        loc = where.get(person["name"])
+        if loc:
+            person["home"] = bool(person["home"]) or loc["home"]
+            person["minutes"] = None if person["home"] else loc["minutes"]
+            person["heading_home"] = loc["heading_home"] and not person["home"]
+    return home
+
+
 def status_payload(app):
     config, state = app[CONFIG], app[STATE]
     return {
@@ -332,7 +356,8 @@ def status_payload(app):
         "devices": devices_with_game(app),
         "weather": app[WEATHER].snapshot(),
         "casts": app[CASTS].snapshot(),
-        "home": app[NETWORK].snapshot(),
+        "home": with_locations(app[NETWORK].snapshot(), app[LOCS].snapshot()),
+        "family": app[LOCS].snapshot(),
         "ring": app[RING].snapshot(state.get("quiet_until")),
         "log": state.get("log", []),
     }
@@ -563,6 +588,7 @@ def build_app(alexa, config, pin):
     app[ALEXA] = alexa
     app[DEVICES] = Devices(config, HERE)
     app[WEATHER] = Weather(config["postcode"], HERE / "weather_location.txt")
+    app[LOCS] = Locations(HERE / "google_cookies.txt", config["loc_account"], config["loc_names"])
     app[RING] = RingDoor(HERE / "ring_token.json", HERE / "ring_listen.json")
     app[RING].on_press = lambda: ring_pressed(app)
     app[NETWORK] = HomeNetwork(config["hub_ip"], config["people"], config["computers"])

@@ -5,4 +5,5 @@ PSNAWP
 pychromecast
 psutil
 ring_doorbell
+locationsharinglib
 pytest

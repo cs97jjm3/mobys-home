@@ -337,6 +337,27 @@
   #lv-shot img { width: 54px; height: 30px; object-fit: cover; border-radius: 6px; }
   @media (prefers-reduced-motion: reduce) { .lv-badge i { animation: none; } }
 
+  /* ---------- family map ---------- */
+  .c-family { --hue: var(--people); }
+  .famap { height: 300px; border-radius: 16px; overflow: hidden; background: var(--raised); }
+  .famap-inner { height: 100%; width: 100%; }
+  :root[data-theme="night"] .famap .leaflet-tile-pane { filter: invert(1) hue-rotate(190deg) brightness(.95) contrast(.9) saturate(.6); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme]) .famap .leaflet-tile-pane { filter: invert(1) hue-rotate(190deg) brightness(.95) contrast(.9) saturate(.6); } }
+  .fam-pin span { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: #fff;
+                  font: 700 15px var(--display); border: 3px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,.35); }
+  .home-pin svg { width: 34px; height: 34px; filter: drop-shadow(0 4px 8px rgba(0,0,0,.35)); }
+  .fam { list-style: none; margin: 12px 0 0; padding: 0; }
+  .fam li { display: flex; gap: 12px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); cursor: pointer; }
+  .fam li:first-child { border-top: 0; }
+  .fam .fam-dot { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+              font: 700 13px var(--display); flex: none; }
+  .fam .nm { font-weight: 650; font-size: 14px; }
+  .fam .where { font-weight: 500; color: var(--muted); margin-left: 6px; }
+  .fam .where.home { color: var(--ok); } .fam .where.coming { color: var(--sky); }
+  .fam .st { font-size: 12px; color: var(--muted); }
+  .face small { display: block; font-size: 11px; color: var(--muted); font-weight: 500; }
+  .face.coming .av { border-style: solid; border-color: var(--sky); color: var(--sky); }
+
   /* ---------- routines ---------- */
   .routines { display: flex; flex-wrap: wrap; gap: 8px; }
   .routines button { font-size: 14px; border: 1px solid color-mix(in srgb, var(--sky) 30%, var(--line));
@@ -411,6 +432,8 @@ const ICONS = {
   chev: '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
   video: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3z"/></svg>',
   camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
+  homepin: '<svg viewBox="0 0 34 34"><circle cx="17" cy="17" r="16" fill="#15213a" stroke="#fff" stroke-width="2"/><path d="M17 9l7 6v8h-5v-5h-4v5h-5v-8z" fill="#fff"/></svg>',
   shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/></svg>',
 };
 
@@ -479,7 +502,8 @@ function drawHello() {
   const faces = people.map(p => {
     const word = p.home === null ? "" : p.home ? "Home" : "Out";
     const tip = p.since ? `${word} since ${when(p.since)}` : word;
-    return `<div class="face ${p.home ? "in" : ""}" title="${esc(tip)}"><span class="av">${esc(p.name.slice(0, 1).toUpperCase())}</span>${esc(p.name)}</div>`;
+    const far = !p.home && p.minutes != null ? `<small>${p.heading_home ? "on the way, " : ""}${p.minutes} min away</small>` : "";
+    return `<div class="face ${p.home ? "in" : ""} ${p.heading_home ? "coming" : ""}" title="${esc(tip)}"><span class="av">${esc(p.name.slice(0, 1).toUpperCase())}</span>${esc(p.name)}${far}</div>`;
   }).join("");
   const home = people.filter(p => p.home).map(p => p.name);
   const line = !people.length ? "" : !home.length ? "Nobody's home right now"
@@ -535,12 +559,14 @@ function render() {
       </div>
       <div class="col">
         ${ringCard(d.ring)}
+        ${familyCard(d.family)}
         ${weatherCard(d.weather)}
         ${homeCard(d.home)}
         <div class="card c-log">${head("log", "history", "Recent changes")}${logList(d.log)}</div>
       </div>
     </div>`;
   applyFolds();
+  placeMap(d.family);
   if (a.error) message("Alexa: " + a.error, true);
 }
 
@@ -918,6 +944,75 @@ function closeLiveView() {
   const box = $("liveview"); if (box) box.remove();
 }
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeLiveView(); });
+
+// ---------- family map (Google location sharing) ----------
+const FAMILY_COLOURS = ["#2e8bff", "#e8364f", "#16a873", "#7b61ff", "#ffaa1d", "#0fa9bd"];
+const fam = { map: null, el: null, markers: {}, home: null, fitted: false };
+
+function familyCard(f) {
+  if (!f) return "";
+  const rows = f.people.map((p, i) => {
+    const colour = FAMILY_COLOURS[i % FAMILY_COLOURS.length];
+    const where = p.home ? "Home" : `${p.heading_home ? "On the way home · " : ""}${p.minutes} min from home · ${p.km} km`;
+    const bits = [p.place && !p.home ? esc(p.place) : "", p.seen ? `seen ${ago(p.seen)}` : "",
+      p.battery != null ? `battery ${p.battery}%${p.charging ? " (charging)" : ""}` : ""].filter(Boolean).join(" · ");
+    return `<li onclick="focusPerson('${esc(p.name)}')"><span class="fam-dot" style="background:${colour}">${esc(p.name.slice(0, 1))}</span>
+      <div><div class="nm">${esc(p.name)} <span class="where ${p.home ? "home" : p.heading_home ? "coming" : ""}">${where}</span></div>
+      <div class="st">${bits}</div></div></li>`;
+  }).join("");
+  return `<div class="card c-family">${head("family", "pin", "Family", f.error ? esc(f.error) : "")}
+    <div id="famap-slot" class="famap"></div>
+    ${rows ? `<ul class="fam">${rows}</ul>` : '<p class="empty">Waiting for the first locations…</p>'}</div>`;
+}
+
+function loadLeaflet() {
+  if (window.L || loadLeaflet.loading) return loadLeaflet.loading;
+  const css = document.createElement("link");
+  css.rel = "stylesheet"; css.href = "/static/leaflet.css";   // Leaflet 1.9.4, kept with Moby's Home
+  document.head.appendChild(css);
+  loadLeaflet.loading = new Promise((ok, fail) => {
+    const s = document.createElement("script");
+    s.src = "/static/leaflet.js";
+    s.onload = ok; s.onerror = fail; document.head.appendChild(s);
+  });
+  return loadLeaflet.loading;
+}
+
+// The map is made once and moved into each fresh copy of the card, so it doesn't flicker or reset
+async function placeMap(f) {
+  const slot = $("famap-slot");
+  if (!f || !slot || !f.home) return;
+  try { await loadLeaflet(); } catch (e) { slot.textContent = "The map couldn't load."; return; }
+  if (!fam.el) {
+    fam.el = document.createElement("div"); fam.el.className = "famap-inner";
+    slot.appendChild(fam.el);
+    fam.map = L.map(fam.el, {zoomControl: true, attributionControl: true, scrollWheelZoom: false});
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {maxZoom: 18, attribution: "© OpenStreetMap"}).addTo(fam.map);
+    fam.home = L.marker([f.home.lat, f.home.lon], {icon: L.divIcon({className: "home-pin",
+      html: ICONS.homepin, iconSize: [34, 34], iconAnchor: [17, 17]}), zIndexOffset: -1000}).addTo(fam.map);   // people sit on top of home
+  } else {
+    slot.appendChild(fam.el);
+  }
+  f.people.forEach((p, i) => {
+    const colour = FAMILY_COLOURS[i % FAMILY_COLOURS.length];
+    const icon = L.divIcon({className: "fam-pin", iconSize: [34, 34], iconAnchor: [17, 17],
+      html: `<span style="background:${colour}">${esc(p.name.slice(0, 1))}</span>`});
+    if (!fam.markers[p.name]) fam.markers[p.name] = L.marker([p.lat, p.lon], {icon}).addTo(fam.map);
+    else fam.markers[p.name].setLatLng([p.lat, p.lon]).setIcon(icon);
+    fam.markers[p.name].bindTooltip(`${esc(p.name)}: ${p.home ? "home" : p.minutes + " min from home"}`);
+  });
+  fam.map.invalidateSize();
+  if (!fam.fitted) {
+    const pts = [[f.home.lat, f.home.lon], ...f.people.map(p => [p.lat, p.lon])];
+    fam.map.fitBounds(pts, {padding: [40, 40], maxZoom: 15});
+    fam.fitted = true;
+  }
+}
+function focusPerson(name) {
+  const m = fam.markers[name];
+  if (m && fam.map) { fam.map.setView(m.getLatLng(), 15); m.openTooltip(); }
+}
 
 // ---------- who's home ----------
 function pcIcon(name) {
