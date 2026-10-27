@@ -29,6 +29,9 @@
     const firstWet = hours.find(h => h.rain >= 50);
     return { now: { temp: 11.6, feels: 9.2, wind: 12, gusts: 25, text: "Partly cloudy", icon: "part" },
              hours, days, today: days[0], rain_note: firstWet ? `Rain likely from ${firstWet.time}` : "Dry for the next 12 hours",
+             measured: [{ name: "Marham", temp: 9, km: 27, time: start - 900 },
+                        { name: "Cambridge", temp: 11, km: 51, time: start - 900 },
+                        { name: "Norwich", temp: 11, km: 76, time: start - 900 }],
              error: null, updated: start };
   }
 

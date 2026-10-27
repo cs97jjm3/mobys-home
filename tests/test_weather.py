@@ -34,3 +34,14 @@ def test_night_icons_and_unknown_codes():
     assert wl.describe(0, is_day=False) == ("Clear", "clear-night")
     assert wl.describe(61, is_day=False)[1] == "rain"
     assert wl.describe(None)[1] == "cloud"
+
+
+def test_measured_nearby():
+    import time
+    import weather_link as wl
+    now = time.time()
+    metars = [{"icaoId": "EGSH", "temp": 11, "obsTime": now - 600}, {"icaoId": "EGYM", "temp": 8, "obsTime": now - 600},
+              {"icaoId": "EGSC", "temp": 11, "obsTime": now - 3 * 3600}, {"icaoId": "XXXX", "temp": 5, "obsTime": now}]
+    out = wl.shape_measured(metars, (52.666, 0.159), now)
+    assert [m["name"] for m in out] == ["Marham", "Norwich"]     # nearest first; Cambridge too old; unknown left out
+    assert out[0]["temp"] == 8 and out[0]["km"] == 27

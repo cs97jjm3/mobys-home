@@ -10,7 +10,7 @@ Try the demo, running against a pretend house: https://cs97jjm3.github.io/mobys-
 - **Lights and plugs:** anything Alexa can switch, with dimming where the light supports it, and colour and warm-to-cool white for colour lights. A coloured light glows in its own colour on the page. The switching goes through Alexa, so there's no need for separate Tuya or Smart Life keys.
 - **Routines:** your Alexa routines as buttons.
 - **Echos:** whether each one is online, what's playing (with play, pause and skip), the volume, Do Not Disturb, and the next alarm or timer.
-- **Weather:** now, the next few hours and the next five days, from Open-Meteo. You don't need an account.
+- **Weather:** now, the next few hours and the next five days, from Open-Meteo, plus real measured temperatures from the nearest airfields (Marham, Cambridge, Norwich, via aviationweather.gov) to check the forecast against. You don't need an account for either.
 - **TV and consoles:**
   - Samsung TV: whether it's on and which app is on screen (or your usual source, like BT TV), with power, volume and apps.
   - BT / EE TV Box Pro: says when it's on Netflix or YouTube, and when it's streaming any other app (iPlayer, ITVX, Prime and so on). Live channels show as just "BT TV". See "The EE TV box" below.

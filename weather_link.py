@@ -5,11 +5,18 @@ Looks up the postcode once with postcodes.io, then fetches the current
 weather, the next 12 hours and the next 5 days every 15 minutes.
 """
 
+import math
 import time
 from datetime import datetime
 from pathlib import Path
 
 REFRESH_EVERY = 15 * 60
+MEASURED_EVERY = 30 * 60     # airfields report every half hour
+MEASURED_MAX_AGE = 2 * 3600  # ignore readings older than this
+# Nearby airfields that publish real measured weather (METAR): code -> (name, latitude, longitude)
+AIRFIELDS = {"EGYM": ("Marham", 52.648, 0.551), "EGSC": ("Cambridge", 52.205, 0.175),
+             "EGSH": ("Norwich", 52.676, 1.283)}
+METAR_URL = "https://aviationweather.gov/api/data/metar?ids={ids}&format=json"
 
 # WMO weather codes -> (description, icon)
 CODES = {
@@ -81,6 +88,25 @@ def shape(data, now=None):
     return out
 
 
+def km_between(a, b):
+    lat1, lon1, lat2, lon2 = map(math.radians, (*a, *b))
+    h = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
+    return 6371 * 2 * math.asin(math.sqrt(h))
+
+
+def shape_measured(metars, home, now=None):
+    """Airfield readings -> [{"name", "temp", "km", "time"}], nearest first, recent ones only."""
+    now = now or time.time()
+    out = []
+    for m in metars or []:
+        place = AIRFIELDS.get(m.get("icaoId"))
+        temp, when = m.get("temp"), m.get("obsTime")
+        if not place or temp is None or not when or now - when > MEASURED_MAX_AGE:
+            continue
+        out.append({"name": place[0], "temp": temp, "km": round(km_between(home, place[1:])), "time": when})
+    return sorted(out, key=lambda r: r["km"])
+
+
 class Weather:
     def __init__(self, postcode, cache_file):
         self.postcode = postcode.strip()
@@ -89,6 +115,8 @@ class Weather:
         self.data = None
         self.fetched = 0
         self.error = None
+        self.measured = []
+        self.measured_fetched = 0
 
     async def _locate(self, session):
         key = self.postcode.upper().replace(" ", "")
@@ -124,11 +152,26 @@ class Weather:
             self.data = shape(raw)
             self.fetched = time.time()
             self.error = None
+            await self._measured(session)
         except Exception as err:
             self.error = str(err) or err.__class__.__name__
             print(f"Weather: {self.error}")
 
+    async def _measured(self, session):
+        """Real thermometer readings from nearby airfields, to sit next to the forecast."""
+        if time.time() - self.measured_fetched < MEASURED_EVERY:
+            return
+        self.measured_fetched = time.time()
+        try:
+            url = METAR_URL.format(ids=",".join(AIRFIELDS))
+            async with session.get(url, headers={"User-Agent": "MobysHome/1.0"}) as r:
+                metars = await r.json(content_type=None)
+            self.measured = shape_measured(metars, self.where)
+        except Exception as err:
+            print(f"Weather: couldn't get the airfield readings ({err.__class__.__name__})")
+
     def snapshot(self):
         if not self.postcode:
             return None
-        return dict(self.data or {}, error=self.error, updated=self.fetched or None)
+        recent = [m for m in self.measured if time.time() - m["time"] < MEASURED_MAX_AGE]
+        return dict(self.data or {}, error=self.error, updated=self.fetched or None, measured=recent)
