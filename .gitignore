@@ -23,3 +23,6 @@ __pycache__/
 ring_token.json
 ring_listen.json
 ring_snapshot_*.jpg
+
+# Google sign-in for location sharing
+google_cookies.txt
