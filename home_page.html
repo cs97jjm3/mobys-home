@@ -337,6 +337,18 @@
   #lv-shot img { width: 54px; height: 30px; object-fit: cover; border-radius: 6px; }
   @media (prefers-reduced-motion: reduce) { .lv-badge i { animation: none; } }
 
+  /* ---------- arranging the cards ---------- */
+  .arrange-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: -4px 0 14px; padding: 10px 14px;
+                 border-radius: 14px; background: var(--raised); border: 1px dashed var(--faint); font-size: 14px; color: var(--muted); }
+  .arrange-bar button { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 6px 13px; cursor: pointer; }
+  .arrange-bar button.done { margin-left: auto; background: var(--ink); color: var(--card); border-color: var(--ink); }
+  .layout.arranging .card { outline: 2px dashed color-mix(in srgb, var(--hue, var(--blue)) 50%, transparent); outline-offset: 3px; }
+  .mover { display: inline-flex; gap: 4px; margin-left: auto; }
+  .mover button { width: 32px; height: 32px; border-radius: 10px; border: 1px solid var(--line); background: var(--raised);
+                  color: var(--ink); cursor: pointer; font-size: 15px; }
+  .mover button:hover { background: var(--ink); color: var(--card); }
+  #arrange-btn[aria-pressed="true"] { background: var(--ink); color: var(--card); }
+
   /* ---------- family map ---------- */
   .c-family { --hue: var(--people); }
   .famap { height: 300px; border-radius: 16px; overflow: hidden; background: var(--raised); }
@@ -393,6 +405,7 @@
   <div class="brand"><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="mh-home" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b8fe0"/><stop offset="1" stop-color="#1c5cab"/></linearGradient></defs><rect width="512" height="512" rx="116" fill="url(#mh-home)"/><path d="M256 118 L392 236 C 400 243, 396 256, 385 256 L 364 256 L 364 372 C 364 384, 356 392, 344 392 L 168 392 C 156 392, 148 384, 148 372 L 148 256 L 127 256 C 116 256, 112 243, 120 236 Z" fill="#fff"/><path d="M226 392 L226 318 C226 306, 234 298, 246 298 L266 298 C278 298, 286 306, 286 318 L286 392 Z" fill="url(#mh-home)"/><circle cx="256" cy="210" r="22" fill="#f5823f"/></svg><h1>Moby's Home</h1></div>
   <div class="status"><span class="msg" id="msg"></span><span id="updated"></span>
     <span class="modes" id="modes" role="group" aria-label="Look"></span>
+    <button class="iconbtn" id="arrange-btn" aria-pressed="false" onclick="arrange(!state.arranging)" title="Move the cards around">Arrange</button>
     <button class="iconbtn" onclick="refreshNow()" title="Ask Alexa for the latest now">Refresh</button></div>
 </header>
 <section class="hello" id="hello"></section>
@@ -534,40 +547,93 @@ const head = (key, icon, title, sub) => `<div class="head" data-key="${key}">
     <span class="bub">${ICONS[icon]}</span><span class="title">${title}</span>${ICONS.chev}</button>
   ${sub ? `<p class="sub">${sub}</p>` : ""}</div>`;
 
+// ---------- layout: which cards go where. Each phone or laptop keeps its own ----------
+const DEFAULT_LAYOUT = {left: ["lights", "media", "echo", "routines"], right: ["ring", "family", "weather", "pcs", "log"]};
+function savedLayout() {
+  try { const l = JSON.parse(localStorage.getItem("mh-layout") || "null"); if (l && l.left && l.right) return l; } catch (e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+}
+function saveLayout(l) { try { localStorage.setItem("mh-layout", JSON.stringify(l)); } catch (e) {} }
+
 function render() {
   const d = state.data;
   if (!d) return;
   const a = d.alexa;
   drawHello();
-  $("app").innerHTML = `
-    <div class="tiles">${heatingTile(d.heating)}${raceTile(d.race)}${d.ring ? ringTile(d.ring) + doorTiles(a.sensors.filter(s => s.kind === "SECURITY_PANEL"), 1) : doorTiles(a.sensors, 2)}</div>
-    <div class="layout">
-      <div class="col">
-        <div class="card c-lights">
+  const cards = {
+    lights: `<div class="card c-lights">
           ${head("lights", "Light", "Lights and plugs", `${a.switches.filter(s => s.power === "ON").length} on`)}
           ${a.switches.length ? `<div class="grid">${a.switches.map(switchTile).join("")}</div>`
             : '<p class="empty">No lights or plugs found in Alexa yet.</p>'}
-        </div>
-        ${mediaCard(d.devices, d.casts)}
-        <div class="card c-echo">${head("echo", "echo", "Echos")}${echoList(a)}</div>
-        <div class="card c-routines">
+        </div>`,
+    media: mediaCard(d.devices, d.casts),
+    echo: `<div class="card c-echo">${head("echo", "echo", "Echos")}${echoList(a)}</div>`,
+    routines: `<div class="card c-routines">
           ${head("routines", "spark", "Routines", "Tap to run")}
           ${a.routines.length ? `<div class="routines">${a.routines.map(r =>
             `<button onclick='runRoutine(${JSON.stringify(r).replace(/'/g, "&#39;")})'>${esc(r.replace(/^alexa,\s*/i, ""))}</button>`).join("")}</div>`
             : '<p class="empty">No routines found.</p>'}
-        </div>
-      </div>
-      <div class="col">
-        ${ringCard(d.ring)}
-        ${familyCard(d.family)}
-        ${weatherCard(d.weather)}
-        ${homeCard(d.home)}
-        <div class="card c-log">${head("log", "history", "Recent changes")}${logList(d.log)}</div>
-      </div>
+        </div>`,
+    ring: ringCard(d.ring),
+    family: familyCard(d.family),
+    weather: weatherCard(d.weather),
+    pcs: homeCard(d.home),
+    log: `<div class="card c-log">${head("log", "history", "Recent changes")}${logList(d.log)}</div>`,
+  };
+  const layout = savedLayout();
+  // Any card this device hasn't placed yet goes where it normally lives
+  Object.keys(cards).forEach(k => {
+    if (!layout.left.includes(k) && !layout.right.includes(k))
+      (DEFAULT_LAYOUT.left.includes(k) ? layout.left : layout.right).push(k);
+  });
+  const col = keys => keys.map(k => cards[k] || "").join("");
+  $("app").innerHTML = `
+    <div class="tiles">${heatingTile(d.heating)}${raceTile(d.race)}${d.ring ? ringTile(d.ring) + doorTiles(a.sensors.filter(s => s.kind === "SECURITY_PANEL"), 1) : doorTiles(a.sensors, 2)}</div>
+    ${state.arranging ? `<div class="arrange-bar">Use ↑ ↓ to move a card, ⇄ to send it to the other column.
+      <button onclick="resetLayout()">Reset layout</button><button class="done" onclick="arrange(false)">Done</button></div>` : ""}
+    <div class="layout ${state.arranging ? "arranging" : ""}">
+      <div class="col" data-col="left">${col(layout.left)}</div>
+      <div class="col" data-col="right">${col(layout.right)}</div>
     </div>`;
   applyFolds();
+  if (state.arranging) addMoveButtons();
   placeMap(d.family);
   if (a.error) message("Alexa: " + a.error, true);
+}
+
+function arrange(on) { state.arranging = on; $("arrange-btn").setAttribute("aria-pressed", String(on)); render(); }
+function resetLayout() { try { localStorage.removeItem("mh-layout"); } catch (e) {} render(); }
+function addMoveButtons() {
+  document.querySelectorAll(".layout .col .card > .head[data-key]").forEach(h => {
+    const key = h.dataset.key;
+    const box = document.createElement("span");
+    box.className = "mover";
+    box.innerHTML = `<button onclick="moveCard('${key}', -1)" aria-label="Move up">↑</button>
+      <button onclick="moveCard('${key}', 1)" aria-label="Move down">↓</button>
+      <button onclick="moveCard('${key}', 0)" aria-label="Move to the other column">⇄</button>`;
+    h.appendChild(box);
+  });
+}
+function moveCard(key, step) {
+  const l = savedLayout();
+  // Only the cards actually on the page count, so a hidden card doesn't swallow a move
+  const shown = new Set([...document.querySelectorAll(".layout .card > .head[data-key]")].map(h => h.dataset.key));
+  const side = l.left.includes(key) ? "left" : "right";
+  const list = l[side].filter(k => shown.has(k) || k === key);
+  const rest = l[side].filter(k => !list.includes(k));
+  const i = list.indexOf(key);
+  if (step === 0) {
+    list.splice(i, 1);
+    const other = side === "left" ? "right" : "left";
+    l[other] = [key, ...l[other].filter(k => k !== key)];
+  } else {
+    const j = i + step;
+    if (j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  l[side] = [...list, ...rest];
+  saveLayout(l);
+  render();
 }
 
 function heatingTile(h) {
@@ -947,7 +1013,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeLiveVie
 
 // ---------- family map (Google location sharing) ----------
 const FAMILY_COLOURS = ["#2e8bff", "#e8364f", "#16a873", "#7b61ff", "#ffaa1d", "#0fa9bd"];
-const fam = { map: null, el: null, markers: {}, home: null, fitted: false };
+const fam = { map: null, el: null, markers: {}, home: null, fitted: "" };
 
 function familyCard(f) {
   if (!f) return "";
@@ -960,7 +1026,7 @@ function familyCard(f) {
       <div><div class="nm">${esc(p.name)} <span class="where ${p.home ? "home" : p.heading_home ? "coming" : ""}">${where}</span></div>
       <div class="st">${bits}</div></div></li>`;
   }).join("");
-  return `<div class="card c-family">${head("family", "pin", "Family", f.error ? esc(f.error) : "")}
+  return `<div class="card c-family">${head("family", "pin", "Family", f.error ? esc(f.error) : `<button class="chip" onclick="showEveryone()">Show everyone</button>`)}
     <div id="famap-slot" class="famap"></div>
     ${rows ? `<ul class="fam">${rows}</ul>` : '<p class="empty">Waiting for the first locations…</p>'}</div>`;
 }
@@ -1003,11 +1069,15 @@ async function placeMap(f) {
     fam.markers[p.name].bindTooltip(`${esc(p.name)}: ${p.home ? "home" : p.minutes + " min from home"}`);
   });
   fam.map.invalidateSize();
-  if (!fam.fitted) {
-    const pts = [[f.home.lat, f.home.lon], ...f.people.map(p => [p.lat, p.lon])];
-    fam.map.fitBounds(pts, {padding: [40, 40], maxZoom: 15});
-    fam.fitted = true;
-  }
+  // Re-fit the map when someone appears or moves a fair way, so nobody ends up off the edge
+  const sig = f.people.map(p => `${p.name}:${p.lat.toFixed(2)},${p.lon.toFixed(2)}`).join("|");
+  if (sig !== fam.fitted) { showEveryone(f); fam.fitted = sig; }
+}
+function showEveryone(f) {
+  f = f || (state.data && state.data.family);
+  if (!f || !fam.map || !f.home) return;
+  const pts = [[f.home.lat, f.home.lon], ...f.people.map(p => [p.lat, p.lon])];
+  fam.map.fitBounds(pts, {padding: [40, 40], maxZoom: 15});
 }
 function focusPerson(name) {
   const m = fam.markers[name];
